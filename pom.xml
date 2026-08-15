@@ -11,7 +11,7 @@
     <groupId>com</groupId>
     <artifactId>clinic-booking-backend</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <n>clinic-booking-backend</n>
+    <name>clinic-booking-backend</name>
     <description>clinic-booking-backend</description>
     <url/>
     <licenses>
