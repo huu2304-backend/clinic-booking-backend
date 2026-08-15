@@ -3,8 +3,8 @@
 > Hệ thống đặt lịch khám bệnh thông minh — chống trùng lịch hẹn (Booking Conflict) và tự động hóa phân luồng bệnh nhân bằng AI Triage.
 >
 ![Status](https://img.shields.io/badge/status-in%20development-yellow)
-![Java](https://img.shields.io/badge/Java-17%2B-orange)
-![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.x-green)
+![Java](https://img.shields.io/badge/Java-21-orange)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.x-green)
 ![React](https://img.shields.io/badge/React-18.x-61DAFB)
 
 ---
@@ -49,10 +49,10 @@
 ## 2. Kiến trúc & Tech Stack
 
 ```
-┌─────────────┐     REST API      ┌──────────────────┐     JDBC      ┌───────────┐
-│   React SPA │ ───────────────►  │  Spring Boot API │ ────────────► │   MySQL   │
-│  (WebStorm) │  ◄─────────────── │   (IntelliJ)     │ ◄──────────── │           │
-└─────────────┘      JSON         └──────────────────┘               └───────────┘
+┌─────────────┐     REST API      ┌──────────────────┐     JDBC      ┌────────────┐
+│   React SPA │ ───────────────►  │  Spring Boot API │ ────────────► │ PostgreSQL │
+│  (WebStorm) │  ◄─────────────── │   (IntelliJ)     │ ◄──────────── │            │
+└─────────────┘      JSON         └──────────────────┘               └────────────┘
                                             │
                                             ▼
                                    ┌──────────────────┐
@@ -64,9 +64,9 @@
 
 | Layer | Công nghệ |
 |---|---|
-| Backend | Java, Spring Boot 3.x, Spring Web MVC, Spring Data JPA, Spring Security (JWT) |
+| Backend | Java 21, Spring Boot 4.1.x, Spring Web MVC, Spring Data JPA, Spring Security |
 | Frontend | JavaScript, ReactJS 18.x, Axios, React Router |
-| Database | MySQL (dev: XAMPP, quản trị: Azure Data Studio) |
+| Database | **PostgreSQL** (chạy qua Docker container — đồng nhất giữa các máy dev, không cài local qua XAMPP; quản trị bằng Azure Data Studio hoặc pgAdmin) |
 | Migration | Flyway |
 | API Docs | springdoc-openapi (Swagger UI) |
 | Auth | JWT (JSON Web Token) |
@@ -76,6 +76,8 @@
 | CI | GitHub Actions |
 | Quản lý task | Jira (Scrum: Backlog → Sprint 1-5) |
 | Version Control | GitHub, Git Flow (`main` / `develop` / `feature/*`) |
+
+> **Lưu ý:** Dự án ban đầu định dùng MySQL (qua XAMPP), sau đó đổi hẳn sang PostgreSQL chạy bằng Docker để đảm bảo mọi máy dev (kể cả sau này thêm người) dùng chung 1 phiên bản DB giống hệt nhau, tránh lỗi "chạy máy tôi thì được". Azure Data Studio vẫn dùng được để quản trị PostgreSQL qua extension.
 
 ---
 
@@ -120,7 +122,7 @@ Chi tiết đầy đủ nằm ở tài liệu đặc tả nghiệp vụ riêng (
 ```
 clinic-booking-system/
 ├── backend/                     # Spring Boot (IntelliJ IDEA)
-│   ├── src/main/java/com/cbs/
+│   ├── src/main/java/com/clinicbookingbackend/
 │   │   ├── config/               # Security, Swagger, CORS config
 │   │   ├── controller/           # REST Controllers
 │   │   ├── service/               # Business logic
@@ -132,7 +134,7 @@ clinic-booking-system/
 │   │   └── scheduler/                 # Scheduled jobs (VD: dọn LOCKED hết hạn)
 │   ├── src/main/resources/
 │   │   ├── db/migration/          # Flyway migration scripts (V1__..., V2__...)
-│   │   └── application.yml
+│   │   └── application.properties
 │   └── pom.xml
 ├── frontend/                    # ReactJS (WebStorm)
 │   ├── src/
@@ -155,28 +157,31 @@ clinic-booking-system/
 
 ## 6. Yêu cầu môi trường
 
-- JDK 17+
+- JDK 21
 - Maven 3.8+
 - Node.js 18+ / npm
-- MySQL 8.x (qua XAMPP khi dev local)
-- Docker & Docker Compose (khi build/deploy)
+- Docker & Docker Compose (chạy PostgreSQL local — xem `docker-compose.yml`, không cần cài DB trực tiếp lên máy)
 - IntelliJ IDEA (backend), WebStorm (frontend)
 
 ---
 
 ## 7. Cài đặt & Chạy dự án
 
-### 7.1. Chạy Backend (local, không Docker)
+### 7.1. Chạy Backend (local)
 
 ```bash
+# 1. Khởi động PostgreSQL bằng Docker trước
+cp .env.example .env   # rồi sửa DB_PASSWORD trong .env
+docker-compose up -d postgres
+
+# 2. Chạy backend
 cd backend
-# Cấu hình DB trong application.yml hoặc qua biến môi trường (xem mục 8)
 mvn clean install
 mvn spring-boot:run
 ```
 
 Backend mặc định chạy tại: `http://localhost:8080`
-Swagger UI: `http://localhost:8080/swagger-ui.html`
+Swagger UI: `http://localhost:8080/swagger-ui/index.html`
 
 ### 7.2. Chạy Frontend (local)
 
@@ -194,18 +199,18 @@ Frontend mặc định chạy tại: `http://localhost:3000`
 docker-compose up --build
 ```
 
-Lệnh này sẽ khởi động đồng thời: `backend` + `frontend` + `mysql`.
+Lệnh này sẽ khởi động đồng thời: `backend` + `frontend` + `postgres` (backend/frontend service sẽ được thêm vào `docker-compose.yml` ở Sprint 5 — hiện tại file chỉ có service `postgres` phục vụ dev local).
 
 ---
 
 ## 8. Biến môi trường
 
-Tạo file `.env` ở root (copy từ `.env.example`), **không commit file `.env` thật lên Git**.
+Tạo file `.env` ở root (copy từ `.env.example`), **không commit file `.env` thật lên Git** (đã có trong `.gitignore`).
 
 | Biến | Mô tả | Ví dụ |
 |---|---|---|
-| `DB_URL` | JDBC URL kết nối MySQL | `jdbc:mysql://localhost:3306/cbs_db` |
-| `DB_USERNAME` | Username DB | `root` |
+| `DB_NAME` | Tên database PostgreSQL | `cbs_db` |
+| `DB_USERNAME` | Username DB | `postgres` |
 | `DB_PASSWORD` | Password DB | `********` |
 | `JWT_SECRET` | Secret key ký JWT | `********` |
 | `JWT_EXPIRATION` | Thời gian hết hạn token (ms) | `86400000` |
@@ -214,7 +219,9 @@ Tạo file `.env` ở root (copy từ `.env.example`), **không commit file `.en
 | `SLOT_LOCK_TTL_MINUTES` | TTL giữ chỗ slot trước khi tự trả `AVAILABLE` | `5` |
 | `CANCEL_MIN_HOURS_BEFORE` | Số giờ tối thiểu trước giờ khám được phép hủy | `24` |
 
-> Danh sách này sẽ tăng dần theo tiến độ code — cập nhật ngay khi thêm biến môi trường mới, đừng để README lệch với `application.yml` thật.
+`application.properties` đọc các biến DB qua cú pháp `${DB_NAME:cbs_db}` (có giá trị mặc định khi chạy local không qua Docker).
+
+> Danh sách này sẽ tăng dần theo tiến độ code — cập nhật ngay khi thêm biến môi trường mới, đừng để README lệch với `application.properties` thật.
 
 ---
 
@@ -223,7 +230,7 @@ Tạo file `.env` ở root (copy từ `.env.example`), **không commit file `.en
 Toàn bộ API được document tự động qua **springdoc-openapi**, truy cập khi backend đang chạy:
 
 ```
-http://localhost:8080/swagger-ui.html
+http://localhost:8080/swagger-ui/index.html
 ```
 
 Quy trình test API: **luôn test qua Swagger UI trước khi code Frontend** cho tính năng đó (đảm bảo API đúng hành vi/response trước khi ràng buộc UI vào).
@@ -305,7 +312,7 @@ Xem chi tiết Sprint 5 (Docker + Render). Sau khi deploy, cập nhật link pro
 
 - **Backend (Render):** `<sẽ cập nhật>`
 - **Frontend (Render):** `<sẽ cập nhật>`
-- **Swagger production:** `<sẽ cập nhật>/swagger-ui.html`
+- **Swagger production:** `<sẽ cập nhật>/swagger-ui/index.html`
 
 ---
 
