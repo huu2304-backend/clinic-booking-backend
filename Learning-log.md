@@ -11,6 +11,23 @@
 - Xong mỗi Task Jira → viết vài dòng phản tư ở cuối file (mục "Phản tư sau mỗi Task")
 - Không cần commit file này lên Git nếu không muốn — đây là ghi chép cá nhân, không phải deliverable
 
+### Cách xem Database cực kỳ đơn giản qua Docker:
+Bạn chỉ cần chạy lệnh sau trên PowerShell:
+
+powershell
+docker exec -it cbs_postgres psql -U postgres -d cbs_db
+Khi vào được giao diện psql (có dấu nhắc cbs_db=#), bạn có thể gõ các câu lệnh:
+
+sql
+-- 1. Xem danh sách các bảng hiện có
+\dt
+-- 2. Xem toàn bộ tài khoản vừa đăng ký
+SELECT id, email, role, status, created_at FROM account;
+-- 3. Xem chi tiết hồ sơ bệnh nhân
+SELECT * FROM patient_profile;
+-- 4. Thoát khỏi psql
+\q
+
 ---
 
 ## 📚 Khái niệm / Annotation đã học
