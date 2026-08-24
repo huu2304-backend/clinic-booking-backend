@@ -64,7 +64,7 @@
 
 | Layer | Công nghệ |
 |---|---|
-| Backend | Java 21, Spring Boot 4.1.x, Spring Web MVC, Spring Data JPA, Spring Security |
+| Backend | Java 17, Spring Boot 3.1.x, Spring Web MVC, Spring Data JPA, Spring Security |
 | Frontend | JavaScript, ReactJS 18.x, Axios, React Router |
 | Database | **PostgreSQL** (chạy qua Docker container — đồng nhất giữa các máy dev, không cài local qua XAMPP; quản trị bằng Azure Data Studio hoặc pgAdmin) |
 | Migration | Flyway |

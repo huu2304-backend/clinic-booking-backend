@@ -2,6 +2,8 @@ package com.clinicbookingbackend.service.auth;
 
 import com.clinicbookingbackend.common.exception.BusinessException;
 import com.clinicbookingbackend.common.exception.ErrorCode;
+import com.clinicbookingbackend.dto.auth.LoginRequest;
+import com.clinicbookingbackend.dto.auth.LoginResponse;
 import com.clinicbookingbackend.dto.auth.RegisterRequest;
 import com.clinicbookingbackend.dto.auth.RegisterResponse;
 import com.clinicbookingbackend.entity.account.Account;
@@ -10,6 +12,7 @@ import com.clinicbookingbackend.entity.account.enums.Role;
 import com.clinicbookingbackend.entity.account.enums.Status;
 import com.clinicbookingbackend.repository.AccountRepository;
 import com.clinicbookingbackend.repository.PatientProfileRepository;
+import com.clinicbookingbackend.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -24,6 +27,7 @@ public class AuthService {
     private final AccountRepository accountRepository;
     private final PatientProfileRepository patientProfileRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtUtil jwtUtil;
 
     @Transactional
     public RegisterResponse registerPatient(RegisterRequest request) {
@@ -47,7 +51,7 @@ public class AuthService {
         profile.setFullName(request.getFullName().trim());
         profile.setDateOfBirth(request.getDateOfBirth());
         profile.setPhoneNumber(request.getPhoneNumber());
-        profile.setGender(request.getGender()); // đã là enum, không cần parse tay
+        profile.setGender(request.getGender());
         patientProfileRepository.save(profile);
 
         log.info("Đăng ký thành công tài khoản ID: {}", savedAccount.getId());
@@ -57,5 +61,28 @@ public class AuthService {
                 savedAccount.getEmail(),
                 profile.getFullName(),
                 savedAccount.getRole().name());
+    }
+
+    @Transactional(readOnly = true)
+    public LoginResponse login(LoginRequest request) {
+        Account account = accountRepository.findByEmail(request.getEmail().toLowerCase().trim())
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_CREDENTIALS));
+
+        if (!passwordEncoder.matches(request.getPassword(), account.getPasswordHash())) {
+            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
+        }
+
+        PatientProfile profile = patientProfileRepository.findByAccountId(account.getId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Không tìm thấy hồ sơ Patient"));
+
+        String token = jwtUtil.generateToken(account.getId(), account.getRole());
+
+        return new LoginResponse(
+                token,
+                account.getId(),
+                account.getEmail(),
+                profile.getFullName(),
+                account.getRole().name()
+        );
     }
 }

@@ -1,5 +1,7 @@
 package com.clinicbookingbackend.controller.auth;
 
+import com.clinicbookingbackend.dto.auth.LoginRequest;
+import com.clinicbookingbackend.dto.auth.LoginResponse;
 import com.clinicbookingbackend.dto.auth.RegisterRequest;
 import com.clinicbookingbackend.dto.auth.RegisterResponse;
 import com.clinicbookingbackend.service.auth.AuthService;
@@ -24,4 +26,11 @@ public class AuthController {
         RegisterResponse response = authService.registerPatient(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
+
+    @PostMapping("/login")
+    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
+        LoginResponse response = authService.login(request);
+        return ResponseEntity.ok(response);
+    }
 }
+
