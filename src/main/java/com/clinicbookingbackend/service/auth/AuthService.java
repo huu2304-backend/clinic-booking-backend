@@ -51,7 +51,7 @@ public class AuthService {
         profile.setFullName(request.getFullName().trim());
         profile.setDateOfBirth(request.getDateOfBirth());
         profile.setPhoneNumber(request.getPhoneNumber());
-        profile.setGender(request.getGender()); // đã là enum, không cần parse tay
+        profile.setGender(request.getGender());
         patientProfileRepository.save(profile);
 
         log.info("Đăng ký thành công tài khoản ID: {}", savedAccount.getId());
@@ -62,6 +62,7 @@ public class AuthService {
                 profile.getFullName(),
                 savedAccount.getRole().name());
     }
+
     @Transactional(readOnly = true)
     public LoginResponse login(LoginRequest request) {
         Account account = accountRepository.findByEmail(request.getEmail().toLowerCase().trim())
