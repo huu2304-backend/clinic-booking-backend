@@ -72,6 +72,10 @@ public class AuthService {
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
         }
 
+        if (account.getStatus() != Status.ACTIVE) {
+            throw new BusinessException(ErrorCode.ACCOUNT_NOT_ACTIVE);
+        }
+
         PatientProfile profile = patientProfileRepository.findByAccountId(account.getId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Không tìm thấy hồ sơ Patient"));
 
