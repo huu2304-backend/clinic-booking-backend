@@ -93,6 +93,8 @@ account (N) ──── (N) audit_log                   [actor, không FK cứn
 
 ## 5. `doctor_schedule` — Slot khám
 
+**Trạng thái hiện tại (đã implement ở CBS-38, migration `V6__create_doctor_schedule_table.sql`):**
+
 | Cột | Kiểu | Ràng buộc | Ghi chú |
 |---|---|---|---|
 | `id` | BIGSERIAL | PK | |
@@ -100,12 +102,20 @@ account (N) ──── (N) audit_log                   [actor, không FK cứn
 | `work_date` | DATE | NOT NULL | |
 | `start_time` | TIME | NOT NULL | |
 | `end_time` | TIME | NOT NULL | |
-| `status` | VARCHAR(20) | NOT NULL, DEFAULT `AVAILABLE`, CHECK IN (`AVAILABLE`, `LOCKED`, `BOOKED`, `CANCELLED`) | BR-SCH-01 |
+| `status` | VARCHAR(20) | NOT NULL, DEFAULT `AVAILABLE`, CHECK IN (`AVAILABLE`, `BOOKED`, `CANCELLED`) | BR-SCH-01 |
+
+**Chưa implement — sẽ thêm ở CBS-41 (migration `V7`, ALTER TABLE, không sửa `V6`):**
+
+| Cột | Kiểu | Ràng buộc | Ghi chú |
+|---|---|---|---|
+| `status` | — | thêm giá trị `LOCKED` vào CHECK constraint | Cần khi có luồng giữ chỗ (CBS-40) |
 | `locked_by_account_id` | BIGINT | FK → `account.id`, NULLABLE | Patient đang giữ chỗ |
 | `lock_expires_at` | TIMESTAMP | NULLABLE | BR-SCH-05, TTL giữ chỗ |
 | `version` | BIGINT | NOT NULL, DEFAULT 0 | Optimistic Locking, BR-APT-02 |
 
-**Index cần có:** composite index trên `(status, lock_expires_at)` — phục vụ job CBS-52 quét LOCKED hết hạn (đã note trong Jira CBS-41).
+**Index cần có (khi làm CBS-41):** composite index trên `(status, lock_expires_at)` — phục vụ job CBS-52 quét LOCKED hết hạn (đã note trong Jira CBS-41).
+
+**Unique constraint hiện có:** `UNIQUE(doctor_profile_id, work_date, start_time)` — chặn tạo 2 slot trùng giờ cho cùng 1 doctor (AC của CBS-38, ánh xạ từ `UNIQUE(doctorId, slotStart)` trong Jira).
 
 ---
 

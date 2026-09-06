@@ -25,6 +25,7 @@ public class SecurityConfig {
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN") // Chỉ ADMIN mới được gọi các API quản trị
+                        .requestMatchers("/api/doctor-schedules/**").hasAnyRole("ADMIN", "DOCTOR") // Ownership check (chỉ chủ sở hữu) nằm trong Service
                         .anyRequest().authenticated() // MỌI API khác bắt buộc phải có JWT hợp lệ
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

@@ -8,6 +8,7 @@ public enum ErrorCode {
 
     // 400 - Validation
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "Dữ liệu đầu vào không hợp lệ"),
+    INVALID_TIME_RANGE(HttpStatus.BAD_REQUEST, "Giờ bắt đầu phải trước giờ kết thúc"),
     ACCOUNT_NOT_ACTIVE(HttpStatus.FORBIDDEN, "Tài khoản đang bị khoá hoặc không hoạt động"),
     // 401 - Authentication
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "Chưa đăng nhập hoặc token không hợp lệ"),
@@ -20,6 +21,7 @@ public enum ErrorCode {
     RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "Không tìm thấy tài nguyên"),
     DEPARTMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "Khoa không tồn tại"),
     DOCTOR_NOT_FOUND(HttpStatus.NOT_FOUND, "Bác sĩ không tồn tại"),
+    SCHEDULE_NOT_FOUND(HttpStatus.NOT_FOUND, "Không tìm thấy lịch làm việc"),
 
     // 409 - Conflict (nghiệp vụ CBS)
     DEPARTMENT_NAME_ALREADY_EXISTS(HttpStatus.CONFLICT, "Tên khoa đã tồn tại"),
@@ -27,6 +29,8 @@ public enum ErrorCode {
     DATA_CONFLICT(HttpStatus.CONFLICT, "Dữ liệu bị trùng hoặc vi phạm ràng buộc, vui lòng thử lại"),
     EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "Email đã được sử dụng"),
     SLOT_UNAVAILABLE(HttpStatus.CONFLICT, "Slot đã được đặt hoặc đang được giữ bởi người khác"),
+    SCHEDULE_SLOT_ALREADY_EXISTS(HttpStatus.CONFLICT, "Slot lịch làm việc đã tồn tại cho bác sĩ này"),
+    SCHEDULE_MODIFICATION_NOT_ALLOWED(HttpStatus.CONFLICT, "Không thể sửa/xóa slot đã được đặt lịch (BOOKED)"),
     CANCELLATION_NOT_ALLOWED(HttpStatus.CONFLICT, "Không thể hủy lịch hẹn trong khung giờ này"),
     AI_PROVIDER_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Hệ thống AI hiện không khả dụng"),
 
