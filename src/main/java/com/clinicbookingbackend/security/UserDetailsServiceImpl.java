@@ -1,7 +1,7 @@
 package com.clinicbookingbackend.security;
 
 import com.clinicbookingbackend.entity.account.Account;
-import com.clinicbookingbackend.repository.AccountRepository;
+import com.clinicbookingbackend.repository.account.AccountRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;

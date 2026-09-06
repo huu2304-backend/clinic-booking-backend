@@ -2,6 +2,7 @@ package com.clinicbookingbackend.common.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -19,6 +20,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiError> handleBusinessException(BusinessException e, HttpServletRequest request) {
         ErrorCode errorCode = e.getErrorCode();
+        log.warn("Business exception [{}] tại {}: {}", errorCode.name(), request.getRequestURI(), e.getMessage());
 
         ApiError apiError = ApiError.builder()
                 .timestamp(LocalDateTime.now())
@@ -48,6 +50,23 @@ public class GlobalExceptionHandler {
                 .build();
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(apiError);
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiError> handleDataIntegrityViolation(DataIntegrityViolationException e, HttpServletRequest request) {
+        // Lưới an toàn cho race condition: 2 request cùng pass check tồn tại rồi cùng insert/update,
+        // constraint UNIQUE ở DB chặn request thứ 2 -> convert thành lỗi nghiệp vụ 409 thay vì 500.
+        log.warn("Data integrity violation tại {}: {}", request.getRequestURI(), e.getMostSpecificCause().getMessage());
+
+        ApiError apiError = ApiError.builder()
+                .timestamp(LocalDateTime.now())
+                .status(ErrorCode.DATA_CONFLICT.getHttpStatus().value())
+                .errorCode(ErrorCode.DATA_CONFLICT.name())
+                .message(ErrorCode.DATA_CONFLICT.getDefaultMessage())
+                .path(request.getRequestURI())
+                .build();
+
+        return ResponseEntity.status(ErrorCode.DATA_CONFLICT.getHttpStatus()).body(apiError);
     }
 
     @ExceptionHandler(Exception.class)
