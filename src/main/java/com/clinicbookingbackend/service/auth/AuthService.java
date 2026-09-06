@@ -10,9 +10,11 @@ import com.clinicbookingbackend.entity.account.Account;
 import com.clinicbookingbackend.entity.account.PatientProfile;
 import com.clinicbookingbackend.entity.account.enums.Role;
 import com.clinicbookingbackend.entity.account.enums.Status;
-import com.clinicbookingbackend.repository.AccountRepository;
-import com.clinicbookingbackend.repository.PatientProfileRepository;
+import com.clinicbookingbackend.repository.account.AccountRepository;
+import com.clinicbookingbackend.repository.account.PatientProfileRepository;
+import com.clinicbookingbackend.repository.doctor.DoctorProfileRepository;
 import com.clinicbookingbackend.security.JwtUtil;
+import com.clinicbookingbackend.service.account.AccountFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -26,8 +28,10 @@ public class AuthService {
 
     private final AccountRepository accountRepository;
     private final PatientProfileRepository patientProfileRepository;
+    private final DoctorProfileRepository doctorProfileRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final AccountFactory accountFactory;
 
     @Transactional
     public RegisterResponse registerPatient(RegisterRequest request) {
@@ -39,11 +43,7 @@ public class AuthService {
             throw new BusinessException(ErrorCode.EMAIL_ALREADY_EXISTS);
         }
 
-        Account account = new Account();
-        account.setEmail(normalizedEmail);
-        account.setPasswordHash(passwordEncoder.encode(request.getPassword()));
-        account.setRole(Role.PATIENT);
-        account.setStatus(Status.ACTIVE);
+        Account account = accountFactory.create(normalizedEmail, request.getPassword(), Role.PATIENT);
         Account savedAccount = accountRepository.save(account);
 
         PatientProfile profile = new PatientProfile();
@@ -76,8 +76,7 @@ public class AuthService {
             throw new BusinessException(ErrorCode.ACCOUNT_NOT_ACTIVE);
         }
 
-        PatientProfile profile = patientProfileRepository.findByAccountId(account.getId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Không tìm thấy hồ sơ Patient"));
+        String fullName = resolveFullName(account);
 
         String token = jwtUtil.generateToken(account.getId(), account.getRole());
 
@@ -85,8 +84,22 @@ public class AuthService {
                 token,
                 account.getId(),
                 account.getEmail(),
-                profile.getFullName(),
+                fullName,
                 account.getRole().name()
         );
+    }
+
+    // fullName nằm ở bảng profile khác nhau tùy role (PatientProfile/DoctorProfile);
+    // Admin chưa có bảng profile riêng trong schema hiện tại nên tạm dùng email.
+    private String resolveFullName(Account account) {
+        return switch (account.getRole()) {
+            case PATIENT -> patientProfileRepository.findByAccountId(account.getId())
+                    .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Không tìm thấy hồ sơ Patient"))
+                    .getFullName();
+            case DOCTOR -> doctorProfileRepository.findByAccountId(account.getId())
+                    .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "Không tìm thấy hồ sơ Doctor"))
+                    .getFullName();
+            case ADMIN -> account.getEmail();
+        };
     }
 }

@@ -1,4 +1,4 @@
-package com.clinicbookingbackend.repository;
+package com.clinicbookingbackend.repository.account;
 
 import com.clinicbookingbackend.entity.account.Account;
 import org.springframework.data.jpa.repository.JpaRepository;
