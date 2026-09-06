@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -47,6 +48,23 @@ public class GlobalExceptionHandler {
                 .message(ErrorCode.VALIDATION_FAILED.getDefaultMessage())
                 .path(request.getRequestURI())
                 .errors(violations)
+                .build();
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(apiError);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiError> handleHttpMessageNotReadable(HttpMessageNotReadableException e, HttpServletRequest request) {
+        // Body JSON sai kiểu/format (vd LocalDate/LocalTime/enum không parse được) -> lỗi của client,
+        // phải là 400 chứ không rơi xuống catch-all 500 ở dưới.
+        log.warn("Body JSON không hợp lệ tại {}: {}", request.getRequestURI(), e.getMessage());
+
+        ApiError apiError = ApiError.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .errorCode(ErrorCode.VALIDATION_FAILED.name())
+                .message("Dữ liệu JSON không hợp lệ hoặc sai định dạng")
+                .path(request.getRequestURI())
                 .build();
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(apiError);
