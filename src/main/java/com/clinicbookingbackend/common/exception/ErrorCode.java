@@ -11,6 +11,7 @@ public enum ErrorCode {
     INVALID_TIME_RANGE(HttpStatus.BAD_REQUEST, "Giờ bắt đầu phải trước giờ kết thúc"),
     PAST_DATE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "Không thể xem lịch của ngày đã qua"),
     ACCOUNT_NOT_ACTIVE(HttpStatus.FORBIDDEN, "Tài khoản đang bị khoá hoặc không hoạt động"),
+    HOLD_REQUIRED(HttpStatus.BAD_REQUEST, "Phải giữ chỗ (hold) slot trước khi xác nhận đặt lịch"),
     // 401 - Authentication
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "Chưa đăng nhập hoặc token không hợp lệ"),
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "Email hoặc mật khẩu không đúng"),
@@ -33,6 +34,7 @@ public enum ErrorCode {
     SCHEDULE_SLOT_ALREADY_EXISTS(HttpStatus.CONFLICT, "Slot lịch làm việc đã tồn tại cho bác sĩ này"),
     SCHEDULE_MODIFICATION_NOT_ALLOWED(HttpStatus.CONFLICT, "Không thể sửa/xóa slot đã được đặt lịch (BOOKED)"),
     CANCELLATION_NOT_ALLOWED(HttpStatus.CONFLICT, "Không thể hủy lịch hẹn trong khung giờ này"),
+    PATIENT_SCHEDULE_CONFLICT(HttpStatus.CONFLICT, "Bạn đã có lịch hẹn khác trùng khung giờ này, vui lòng chọn giờ khác"),
     AI_PROVIDER_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Hệ thống AI hiện không khả dụng"),
 
     // 500 - Unexpected

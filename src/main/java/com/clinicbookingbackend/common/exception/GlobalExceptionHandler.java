@@ -6,6 +6,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -120,6 +121,24 @@ public class GlobalExceptionHandler {
                 .build();
 
         return ResponseEntity.status(ErrorCode.DATA_CONFLICT.getHttpStatus()).body(apiError);
+    }
+
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<ApiError> handleOptimisticLockingFailure(ObjectOptimisticLockingFailureException e, HttpServletRequest request) {
+        // Lưới an toàn cho race condition ở tầng @Version (hold/confirm slot, CBS-72/CBS-42):
+        // 2 request cùng đọc 1 version, request thua cuộc bị Hibernate từ chối khi flush ->
+        // convert thành lỗi nghiệp vụ 409 thay vì 500 (mirror handleDataIntegrityViolation).
+        log.warn("Optimistic lock conflict tại {}: {}", request.getRequestURI(), e.getMessage());
+
+        ApiError apiError = ApiError.builder()
+                .timestamp(LocalDateTime.now())
+                .status(ErrorCode.SLOT_UNAVAILABLE.getHttpStatus().value())
+                .errorCode(ErrorCode.SLOT_UNAVAILABLE.name())
+                .message(ErrorCode.SLOT_UNAVAILABLE.getDefaultMessage())
+                .path(request.getRequestURI())
+                .build();
+
+        return ResponseEntity.status(ErrorCode.SLOT_UNAVAILABLE.getHttpStatus()).body(apiError);
     }
 
     @ExceptionHandler(Exception.class)

@@ -10,13 +10,13 @@ Feature-scoped theo domain: mỗi domain (`auth`, `account`, `department`, `doct
 Lưu ý: `service/department` và `service/doctor` theo pattern interface + Impl; `service/auth` là class cụ thể — hai convention đang song song, chưa thống nhất.
 
 ## Migration
-`src/main/resources/db/migration/V{n}__mo_ta.sql`, chạy tuần tự, **không sửa file đã áp dụng** (Flyway báo lỗi checksum) — luôn tạo `V{n+1}` mới. Hiện tại: V1 account, V2 patient_profile, V3 department, V4 doctor_profile, V5 seed (15 khoa thật + 50 doctor **TEST**, dùng chung 1 password — không dùng cho môi trường thật), V6 doctor_schedule (chỉ status `AVAILABLE/BOOKED/CANCELLED` — cột lock-related (`locked_by_account_id`, `lock_expires_at`, `version`, status `LOCKED`) sẽ thêm ở CBS-41 bằng `V7`, không sửa V6).
+`src/main/resources/db/migration/V{n}__mo_ta.sql`, chạy tuần tự, **không sửa file đã áp dụng** (Flyway báo lỗi checksum) — luôn tạo `V{n+1}` mới. Hiện tại: V1 account, V2 patient_profile, V3 department, V4 doctor_profile, V5 seed (15 khoa thật + 50 doctor **TEST**, dùng chung 1 password — không dùng cho môi trường thật), V6 doctor_schedule (status `AVAILABLE/BOOKED/CANCELLED`), V7 thêm cột lock-related lên doctor_schedule (`locked_by_account_id`, `lock_expires_at`, `version`, status thêm `LOCKED` — CBS-41), V8 tạo bảng `appointment` (UNIQUE `doctor_schedule_id` — CBS-41; chưa có cột AI-related, sẽ thêm ở task AI Triage Sprint 2).
 
 ## Jira
 Cloud site: `huu2342003.atlassian.net`, project key `CBS`. Tra cứu 1 task: dùng Atlassian MCP `getJiraIssue(cloudId="huu2342003.atlassian.net", issueIdOrKey="CBS-xx")`. **Không suy đoán nội dung task từ tên nhánh/số thứ tự** — luôn tra Jira trước khi lập plan cho 1 task cụ thể.
 
 ## Pattern CRUD chuẩn khi thêm domain mới (đúc kết từ CBS-37/38, tham chiếu domain `doctor`/`doctorschedule`)
-- **Entity**: Lombok `@Getter/@Setter/@NoArgsConstructor/@AllArgsConstructor`, PK `@GeneratedValue(IDENTITY)`. Chưa dùng `@Version`/optimistic locking hay `@CreatedDate` framework ở đâu — timestamp thủ công qua `@PrePersist`/`@PreUpdate` nếu cần (xem `Account.java`).
+- **Entity**: Lombok `@Getter/@Setter/@NoArgsConstructor/@AllArgsConstructor`, PK `@GeneratedValue(IDENTITY)`. Chưa dùng `@CreatedDate` framework ở đâu — timestamp thủ công qua `@PrePersist`/`@PreUpdate` nếu cần (xem `Account.java`). `@Version` (optimistic locking) đã dùng ở `DoctorSchedule` (CBS-41/72/42) cho luồng chống trùng slot — xem `service/booking/BookingServiceImpl`; khi save() thua cuộc tranh chấp version, Hibernate ném `ObjectOptimisticLockingFailureException`, đã có handler riêng trong `GlobalExceptionHandler` map sang 409 `SLOT_UNAVAILABLE` (mirror cách xử lý `DataIntegrityViolationException`).
 - **DTO**: Create/Update request là Lombok `@Data` class (validate bằng `jakarta.validation`), Response là Java `record`.
 - **Mapper**: MapStruct `@Mapper(componentModel="spring")`; mapper **không được gọi Repository** — set relation entity (fetch theo id) trong Service.
 - **Repository**: `JpaRepository` + `existsBy...` để pre-check trùng trước khi insert/update (không chỉ dựa DB constraint — DB constraint là lưới an toàn cuối, `existsBy...` là để trả lỗi nghiệp vụ rõ nghĩa).
@@ -34,6 +34,6 @@ Cloud site: `huu2342003.atlassian.net`, project key `CBS`. Tra cứu 1 task: dù
 ## Bẫy README (đã lệch so với code thật)
 - Tech stack: README ghi Java 21/Spring Boot 3.1.x — **sai**, thật là Java 17/Boot 4.1.0.
 - Cấu trúc: README mô tả monorepo `backend/`+`frontend/` — **sai**, repo này chỉ có backend, phẳng ở root.
-- Schema: README liệt kê đủ appointment/doctor_schedule/triage_session/ai_*/audit_log — **chưa implement đầy đủ**: đã có account/patient_profile/department/doctor_profile/doctor_schedule (bản CRUD cơ bản, chưa có cột lock-related — xem mục Migration); appointment/triage_session/ai_*/audit_log **vẫn chưa có**.
+- Schema: README liệt kê đủ appointment/doctor_schedule/triage_session/ai_*/audit_log — **chưa implement đầy đủ**: đã có account/patient_profile/department/doctor_profile/doctor_schedule (kể cả cột lock-related, CBS-41)/appointment (bản cốt lõi CBS-40/41, chưa có cột AI-related); triage_session/ai_*/audit_log **vẫn chưa có**.
 
 Khi stack/cấu trúc đổi → cập nhật file này ngay, đừng để nó lệch giống README.
