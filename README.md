@@ -50,16 +50,16 @@
 
 ```
 ┌─────────────┐     REST API      ┌──────────────────┐     JDBC      ┌────────────┐
-│   React SPA │ ───────────────►  │  Spring Boot API │ ────────────► │ PostgreSQL │
-│  (WebStorm) │  ◄─────────────── │   (IntelliJ)     │ ◄──────────── │            │
-└─────────────┘      JSON         └──────────────────┘               └────────────┘
+│   React SPA │ ──────────────►  │  Spring Boot API │ ──────────► │ PostgreSQL │
+│  (WebStorm) │  ◄────────────── │   (IntelliJ)     │ ◄────────── │            │
+└─────────────┘      JSON         └──────────────────┘               └──────────┘
                                             │
                                             ▼
-                                   ┌──────────────────┐
+                                   ┌────────────────┐
                                    │  AI Provider API  │
                                    │   (LLM, qua       │
                                    │  AIProviderConfig)│
-                                   └──────────────────┘
+                                   └────────────────┘
 ```
 
 | Layer | Công nghệ |
@@ -87,7 +87,7 @@
 - [ ] **Quản lý Department & Doctor** (Admin)
 - [ ] **Quản lý lịch làm việc bác sĩ** (Doctor Schedule)
 - [ ] **AI Triage:** Chat mô tả triệu chứng → gợi ý khoa khám + mức độ khẩn cấp + tóm tắt bệnh án
-- [ ] **Đặt lịch concurrency-safe:** giữ chỗ tạm thời (`LOCKED`, có TTL) → xác nhận (`BOOKED`)
+- [x] **Đặt lịch concurrency-safe:** giữ chỗ tạm thời (`LOCKED`, có TTL) → xác nhận (`BOOKED`)
 - [ ] **Hủy lịch hẹn** (trong khung thời gian cho phép)
 - [ ] **Doctor Dashboard:** xem lịch khám trong ngày + đọc tóm tắt AI
 - [ ] **Quản lý AI Provider Config** (Admin) — CRUD, mask secret, Audit Log
@@ -270,9 +270,9 @@ Format lỗi chuẩn hóa toàn hệ thống (qua `GlobalExceptionHandler`):
 ## 11. Quy trình phát triển (Git Flow)
 
 ```
-main        ─────●───────────────●──────────►  (production, tag theo version)
+main        ─────●─────────────●──────►  (production, tag theo version)
                   \               \
-develop     ───●───●───●───●───●───●─────────►  (tích hợp các feature)
+develop     ───●───●───●───●───●───●─────►  (tích hợp các feature)
              \   \       \
 feature/*     ●   ●       ●                      (1 nhánh / 1 task Jira)
 ```
