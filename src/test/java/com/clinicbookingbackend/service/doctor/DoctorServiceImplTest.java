@@ -4,6 +4,7 @@ import com.clinicbookingbackend.common.exception.BusinessException;
 import com.clinicbookingbackend.common.exception.ErrorCode;
 import com.clinicbookingbackend.dto.doctor.DoctorCreateRequest;
 import com.clinicbookingbackend.dto.doctor.DoctorResponse;
+import com.clinicbookingbackend.dto.doctor.DoctorSummaryResponse;
 import com.clinicbookingbackend.dto.doctor.DoctorUpdateRequest;
 import com.clinicbookingbackend.entity.account.Account;
 import com.clinicbookingbackend.entity.account.enums.Role;
@@ -266,6 +267,47 @@ class DoctorServiceImplTest {
                 .isEqualTo(ErrorCode.DEPARTMENT_NOT_FOUND);
 
         verify(doctorProfileRepository, never()).findByDepartmentId(any(), any());
+    }
+
+    @Test
+    void getActiveDoctorsByDepartment_shouldReturnMappedPage_whenDepartmentHasActiveDoctors() {
+        Pageable pageable = PageRequest.of(0, 10);
+        DoctorSummaryResponse expectedResponse = new DoctorSummaryResponse(100L, "Nguyễn Văn An", "Nội tổng quát", 1L);
+
+        when(departmentRepository.existsById(1L)).thenReturn(true);
+        when(doctorProfileRepository.findByDepartmentIdAndAccountStatus(1L, Status.ACTIVE, pageable))
+                .thenReturn(new PageImpl<>(List.of(profile), pageable, 1));
+        when(doctorMapper.toSummaryResponse(profile)).thenReturn(expectedResponse);
+
+        var result = doctorService.getActiveDoctorsByDepartment(1L, pageable);
+
+        assertThat(result.getContent()).containsExactly(expectedResponse);
+    }
+
+    @Test
+    void getActiveDoctorsByDepartment_shouldReturnEmptyPage_whenDepartmentHasNoActiveDoctors() {
+        Pageable pageable = PageRequest.of(0, 10);
+
+        when(departmentRepository.existsById(1L)).thenReturn(true);
+        when(doctorProfileRepository.findByDepartmentIdAndAccountStatus(1L, Status.ACTIVE, pageable))
+                .thenReturn(new PageImpl<>(List.of(), pageable, 0));
+
+        var result = doctorService.getActiveDoctorsByDepartment(1L, pageable);
+
+        assertThat(result.getContent()).isEmpty();
+    }
+
+    @Test
+    void getActiveDoctorsByDepartment_shouldThrowNotFound_whenDepartmentMissing() {
+        Pageable pageable = PageRequest.of(0, 10);
+        when(departmentRepository.existsById(99L)).thenReturn(false);
+
+        assertThatThrownBy(() -> doctorService.getActiveDoctorsByDepartment(99L, pageable))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.DEPARTMENT_NOT_FOUND);
+
+        verify(doctorProfileRepository, never()).findByDepartmentIdAndAccountStatus(any(), any(), any());
     }
 
     @Test

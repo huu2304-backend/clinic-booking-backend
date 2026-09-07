@@ -9,6 +9,7 @@ public enum ErrorCode {
     // 400 - Validation
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "Dữ liệu đầu vào không hợp lệ"),
     INVALID_TIME_RANGE(HttpStatus.BAD_REQUEST, "Giờ bắt đầu phải trước giờ kết thúc"),
+    PAST_DATE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "Không thể xem lịch của ngày đã qua"),
     ACCOUNT_NOT_ACTIVE(HttpStatus.FORBIDDEN, "Tài khoản đang bị khoá hoặc không hoạt động"),
     // 401 - Authentication
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "Chưa đăng nhập hoặc token không hợp lệ"),
