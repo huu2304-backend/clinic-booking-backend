@@ -2,10 +2,12 @@ package com.clinicbookingbackend.service.doctorschedule;
 
 import com.clinicbookingbackend.common.exception.BusinessException;
 import com.clinicbookingbackend.common.exception.ErrorCode;
+import com.clinicbookingbackend.dto.doctorschedule.AvailableSlotResponse;
 import com.clinicbookingbackend.dto.doctorschedule.DoctorScheduleCreateRequest;
 import com.clinicbookingbackend.dto.doctorschedule.DoctorScheduleResponse;
 import com.clinicbookingbackend.dto.doctorschedule.DoctorScheduleUpdateRequest;
 import com.clinicbookingbackend.entity.account.Account;
+import com.clinicbookingbackend.entity.account.enums.Status;
 import com.clinicbookingbackend.entity.department.Department;
 import com.clinicbookingbackend.entity.doctor.DoctorProfile;
 import com.clinicbookingbackend.entity.doctorschedule.DoctorSchedule;
@@ -23,8 +25,11 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
@@ -47,8 +52,21 @@ class DoctorScheduleServiceImplTest {
     @Mock
     private DoctorScheduleMapper doctorScheduleMapper;
 
+    @Mock
+    private Clock clock;
+
     @InjectMocks
     private DoctorScheduleServiceImpl doctorScheduleService;
+
+    private static final ZoneId ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+    // "Hôm nay" cố định cho test = 2026-09-07, 08:00 (khớp currentDate của phiên làm việc).
+    private static final LocalDate TODAY = LocalDate.of(2026, 9, 7);
+
+    private void fixClockAt(LocalTime time) {
+        Instant instant = TODAY.atTime(time).atZone(ZONE).toInstant();
+        when(clock.instant()).thenReturn(instant);
+        when(clock.getZone()).thenReturn(ZONE);
+    }
 
     private DoctorProfile doctorProfile;
     private DoctorProfile otherDoctorProfile;
@@ -64,6 +82,7 @@ class DoctorScheduleServiceImplTest {
 
         Account account = new Account();
         account.setId(DOCTOR_ACCOUNT_ID);
+        account.setStatus(Status.ACTIVE);
 
         doctorProfile = new DoctorProfile();
         doctorProfile.setId(100L);
@@ -200,5 +219,91 @@ class DoctorScheduleServiceImplTest {
         doctorScheduleService.delete(1L, authOf(DOCTOR_ACCOUNT_ID, "DOCTOR"));
 
         verify(doctorScheduleRepository).delete(availableSchedule);
+    }
+
+    @Test
+    void getAvailableSlots_shouldThrowNotFound_whenDoctorMissing() {
+        when(doctorProfileRepository.findById(999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> doctorScheduleService.getAvailableSlots(999L, TODAY))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(ex -> assertThat(((BusinessException) ex).getErrorCode()).isEqualTo(ErrorCode.DOCTOR_NOT_FOUND));
+    }
+
+    @Test
+    void getAvailableSlots_shouldThrowNotFound_whenDoctorNotActive() {
+        doctorProfile.getAccount().setStatus(Status.INACTIVE);
+        when(doctorProfileRepository.findById(100L)).thenReturn(Optional.of(doctorProfile));
+
+        assertThatThrownBy(() -> doctorScheduleService.getAvailableSlots(100L, TODAY))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(ex -> assertThat(((BusinessException) ex).getErrorCode()).isEqualTo(ErrorCode.DOCTOR_NOT_FOUND));
+    }
+
+    @Test
+    void getAvailableSlots_shouldThrowPastDateNotAllowed_whenDateIsBeforeToday() {
+        when(doctorProfileRepository.findById(100L)).thenReturn(Optional.of(doctorProfile));
+        fixClockAt(LocalTime.of(8, 0));
+
+        assertThatThrownBy(() -> doctorScheduleService.getAvailableSlots(100L, TODAY.minusDays(1)))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(ex -> assertThat(((BusinessException) ex).getErrorCode()).isEqualTo(ErrorCode.PAST_DATE_NOT_ALLOWED));
+
+        verify(doctorScheduleRepository, never()).findByDoctorProfileIdAndWorkDateAndStatusAndStartTimeGreaterThanEqualOrderByStartTimeAsc(
+                any(), any(), any(), any());
+    }
+
+    @Test
+    void getAvailableSlots_shouldFilterByCurrentTime_whenDateIsToday() {
+        when(doctorProfileRepository.findById(100L)).thenReturn(Optional.of(doctorProfile));
+        fixClockAt(LocalTime.of(10, 30));
+
+        DoctorSchedule schedule = new DoctorSchedule();
+        schedule.setId(1L);
+        schedule.setDoctorProfile(doctorProfile);
+        schedule.setWorkDate(TODAY);
+        schedule.setStartTime(LocalTime.of(11, 0));
+        schedule.setEndTime(LocalTime.of(11, 30));
+        schedule.setStatus(ScheduleStatus.AVAILABLE);
+
+        when(doctorScheduleRepository.findByDoctorProfileIdAndWorkDateAndStatusAndStartTimeGreaterThanEqualOrderByStartTimeAsc(
+                100L, TODAY, ScheduleStatus.AVAILABLE, LocalTime.of(10, 30)))
+                .thenReturn(List.of(schedule));
+        when(doctorScheduleMapper.toAvailableSlotResponse(schedule))
+                .thenReturn(new AvailableSlotResponse(1L, TODAY, LocalTime.of(11, 0), LocalTime.of(11, 30)));
+
+        List<AvailableSlotResponse> result = doctorScheduleService.getAvailableSlots(100L, TODAY);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).startTime()).isEqualTo(LocalTime.of(11, 0));
+    }
+
+    @Test
+    void getAvailableSlots_shouldTakeFullDay_whenDateIsInFuture() {
+        LocalDate tomorrow = TODAY.plusDays(1);
+        when(doctorProfileRepository.findById(100L)).thenReturn(Optional.of(doctorProfile));
+        fixClockAt(LocalTime.of(23, 0));
+
+        when(doctorScheduleRepository.findByDoctorProfileIdAndWorkDateAndStatusAndStartTimeGreaterThanEqualOrderByStartTimeAsc(
+                100L, tomorrow, ScheduleStatus.AVAILABLE, LocalTime.MIN))
+                .thenReturn(List.of());
+
+        List<AvailableSlotResponse> result = doctorScheduleService.getAvailableSlots(100L, tomorrow);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void getAvailableSlots_shouldReturnEmptyList_whenDoctorHasNoSlot() {
+        when(doctorProfileRepository.findById(100L)).thenReturn(Optional.of(doctorProfile));
+        fixClockAt(LocalTime.of(8, 0));
+
+        when(doctorScheduleRepository.findByDoctorProfileIdAndWorkDateAndStatusAndStartTimeGreaterThanEqualOrderByStartTimeAsc(
+                100L, TODAY, ScheduleStatus.AVAILABLE, LocalTime.of(8, 0)))
+                .thenReturn(List.of());
+
+        List<AvailableSlotResponse> result = doctorScheduleService.getAvailableSlots(100L, TODAY);
+
+        assertThat(result).isEmpty();
     }
 }

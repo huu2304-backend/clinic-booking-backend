@@ -4,6 +4,7 @@ import com.clinicbookingbackend.common.exception.BusinessException;
 import com.clinicbookingbackend.common.exception.ErrorCode;
 import com.clinicbookingbackend.dto.doctor.DoctorCreateRequest;
 import com.clinicbookingbackend.dto.doctor.DoctorResponse;
+import com.clinicbookingbackend.dto.doctor.DoctorSummaryResponse;
 import com.clinicbookingbackend.dto.doctor.DoctorUpdateRequest;
 import com.clinicbookingbackend.entity.account.Account;
 import com.clinicbookingbackend.entity.account.enums.Role;
@@ -113,6 +114,17 @@ public class DoctorServiceImpl implements DoctorService {
         }
         return doctorProfileRepository.findByDepartmentId(departmentId, pageable)
                 .map(doctorMapper::toResponse);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<DoctorSummaryResponse> getActiveDoctorsByDepartment(Long departmentId, Pageable pageable) {
+        if (!departmentRepository.existsById(departmentId)) {
+            throw new BusinessException(ErrorCode.DEPARTMENT_NOT_FOUND,
+                    "Không tìm thấy khoa với id=" + departmentId);
+        }
+        return doctorProfileRepository.findByDepartmentIdAndAccountStatus(departmentId, Status.ACTIVE, pageable)
+                .map(doctorMapper::toSummaryResponse);
     }
 
     @Override

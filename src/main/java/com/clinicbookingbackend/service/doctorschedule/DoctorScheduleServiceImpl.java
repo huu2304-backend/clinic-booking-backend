@@ -2,9 +2,11 @@ package com.clinicbookingbackend.service.doctorschedule;
 
 import com.clinicbookingbackend.common.exception.BusinessException;
 import com.clinicbookingbackend.common.exception.ErrorCode;
+import com.clinicbookingbackend.dto.doctorschedule.AvailableSlotResponse;
 import com.clinicbookingbackend.dto.doctorschedule.DoctorScheduleCreateRequest;
 import com.clinicbookingbackend.dto.doctorschedule.DoctorScheduleResponse;
 import com.clinicbookingbackend.dto.doctorschedule.DoctorScheduleUpdateRequest;
+import com.clinicbookingbackend.entity.account.enums.Status;
 import com.clinicbookingbackend.entity.doctor.DoctorProfile;
 import com.clinicbookingbackend.entity.doctorschedule.DoctorSchedule;
 import com.clinicbookingbackend.entity.doctorschedule.enums.ScheduleStatus;
@@ -18,7 +20,10 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -28,6 +33,7 @@ public class DoctorScheduleServiceImpl implements DoctorScheduleService {
     private final DoctorScheduleRepository doctorScheduleRepository;
     private final DoctorProfileRepository doctorProfileRepository;
     private final DoctorScheduleMapper doctorScheduleMapper;
+    private final Clock clock;
 
     @Override
     @Transactional
@@ -105,6 +111,35 @@ public class DoctorScheduleServiceImpl implements DoctorScheduleService {
         // slot không mang lịch sử cần giữ lại như Account, chỉ cấm khi đang BOOKED.
         doctorScheduleRepository.delete(schedule);
         log.info("Xóa slot lịch làm việc thành công, id={}", id);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<AvailableSlotResponse> getAvailableSlots(Long doctorId, LocalDate date) {
+        DoctorProfile doctorProfile = doctorProfileRepository.findById(doctorId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.DOCTOR_NOT_FOUND,
+                        "Không tìm thấy bác sĩ với id=" + doctorId));
+
+        // Doctor đã bị soft-delete (INACTIVE) không được xem như còn tồn tại đối với Patient.
+        if (doctorProfile.getAccount().getStatus() != Status.ACTIVE) {
+            throw new BusinessException(ErrorCode.DOCTOR_NOT_FOUND,
+                    "Không tìm thấy bác sĩ với id=" + doctorId);
+        }
+
+        LocalDate today = LocalDate.now(clock);
+        if (date.isBefore(today)) {
+            throw new BusinessException(ErrorCode.PAST_DATE_NOT_ALLOWED,
+                    "Không thể xem lịch của ngày đã qua: " + date);
+        }
+
+        // Nếu xem lịch hôm nay, ẩn slot có giờ bắt đầu đã qua; ngày tương lai thì lấy trọn ngày.
+        LocalTime startTimeFrom = date.isEqual(today) ? LocalTime.now(clock) : LocalTime.MIN;
+
+        return doctorScheduleRepository.findByDoctorProfileIdAndWorkDateAndStatusAndStartTimeGreaterThanEqualOrderByStartTimeAsc(
+                        doctorId, date, ScheduleStatus.AVAILABLE, startTimeFrom)
+                .stream()
+                .map(doctorScheduleMapper::toAvailableSlotResponse)
+                .toList();
     }
 
     // Doctor chỉ được đụng slot của chính mình; Admin được đụng slot của bất kỳ doctor nào.

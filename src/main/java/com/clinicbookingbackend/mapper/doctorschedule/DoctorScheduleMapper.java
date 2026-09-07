@@ -1,5 +1,6 @@
 package com.clinicbookingbackend.mapper.doctorschedule;
 
+import com.clinicbookingbackend.dto.doctorschedule.AvailableSlotResponse;
 import com.clinicbookingbackend.dto.doctorschedule.DoctorScheduleResponse;
 import com.clinicbookingbackend.dto.doctorschedule.DoctorScheduleUpdateRequest;
 import com.clinicbookingbackend.entity.doctorschedule.DoctorSchedule;
@@ -13,6 +14,8 @@ public interface DoctorScheduleMapper {
     @Mapping(source = "doctorProfile.id", target = "doctorId")
     @Mapping(source = "doctorProfile.fullName", target = "doctorFullName")
     DoctorScheduleResponse toResponse(DoctorSchedule doctorSchedule);
+
+    AvailableSlotResponse toAvailableSlotResponse(DoctorSchedule doctorSchedule);
 
     // "status"/"doctorProfile" phải giữ nguyên giá trị hiện tại của entity, không cho request ghi đè
     // (không có trong CBS-38 AC) — Service tự set khi cần đổi trạng thái.

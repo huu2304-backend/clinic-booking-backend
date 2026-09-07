@@ -7,8 +7,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -64,6 +66,39 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.BAD_REQUEST.value())
                 .errorCode(ErrorCode.VALIDATION_FAILED.name())
                 .message("Dữ liệu JSON không hợp lệ hoặc sai định dạng")
+                .path(request.getRequestURI())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(apiError);
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiError> handleMissingParameter(MissingServletRequestParameterException e, HttpServletRequest request) {
+        // Thiếu query param bắt buộc (vd ?date=) -> lỗi của client, phải là 400 chứ không
+        // rơi xuống catch-all 500 ở dưới (mirror handleHttpMessageNotReadable).
+        log.warn("Thiếu tham số bắt buộc tại {}: {}", request.getRequestURI(), e.getMessage());
+
+        ApiError apiError = ApiError.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .errorCode(ErrorCode.VALIDATION_FAILED.name())
+                .message("Thiếu tham số bắt buộc: " + e.getParameterName())
+                .path(request.getRequestURI())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(apiError);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiError> handleTypeMismatch(MethodArgumentTypeMismatchException e, HttpServletRequest request) {
+        // Query param sai định dạng (vd date=abc không parse được thành LocalDate) -> 400.
+        log.warn("Tham số sai định dạng tại {}: {}", request.getRequestURI(), e.getMessage());
+
+        ApiError apiError = ApiError.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .errorCode(ErrorCode.VALIDATION_FAILED.name())
+                .message("Tham số '" + e.getName() + "' sai định dạng")
                 .path(request.getRequestURI())
                 .build();
 
