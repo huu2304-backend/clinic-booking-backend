@@ -18,9 +18,13 @@ public interface DoctorScheduleMapper {
     AvailableSlotResponse toAvailableSlotResponse(DoctorSchedule doctorSchedule);
 
     // "status"/"doctorProfile" phải giữ nguyên giá trị hiện tại của entity, không cho request ghi đè
-    // (không có trong CBS-38 AC) — Service tự set khi cần đổi trạng thái.
+    // (không có trong CBS-38 AC) — Service tự set khi cần đổi trạng thái. Tương tự, các cột phục vụ
+    // cơ chế giữ chỗ (CBS-41/72) không thuộc request sửa slot của Doctor/Admin.
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "doctorProfile", ignore = true)
     @Mapping(target = "status", ignore = true)
+    @Mapping(target = "lockedByAccountId", ignore = true)
+    @Mapping(target = "lockExpiresAt", ignore = true)
+    @Mapping(target = "version", ignore = true)
     void updateEntityFromRequest(DoctorScheduleUpdateRequest request, @MappingTarget DoctorSchedule entity);
 }
