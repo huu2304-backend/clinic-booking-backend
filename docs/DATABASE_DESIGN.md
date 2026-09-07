@@ -93,7 +93,7 @@ account (N) ──── (N) audit_log                   [actor, không FK cứn
 
 ## 5. `doctor_schedule` — Slot khám
 
-**Trạng thái hiện tại (đã implement ở CBS-38, migration `V6__create_doctor_schedule_table.sql`):**
+**Đã implement (CBS-38 `V6__create_doctor_schedule_table.sql` + CBS-41 `V7__add_slot_lock_columns_to_doctor_schedule.sql`):**
 
 | Cột | Kiểu | Ràng buộc | Ghi chú |
 |---|---|---|---|
@@ -102,24 +102,20 @@ account (N) ──── (N) audit_log                   [actor, không FK cứn
 | `work_date` | DATE | NOT NULL | |
 | `start_time` | TIME | NOT NULL | |
 | `end_time` | TIME | NOT NULL | |
-| `status` | VARCHAR(20) | NOT NULL, DEFAULT `AVAILABLE`, CHECK IN (`AVAILABLE`, `BOOKED`, `CANCELLED`) | BR-SCH-01 |
+| `status` | VARCHAR(20) | NOT NULL, DEFAULT `AVAILABLE`, CHECK IN (`AVAILABLE`, `LOCKED`, `BOOKED`, `CANCELLED`) | BR-SCH-01 — `LOCKED` thêm ở V7 |
+| `locked_by_account_id` | BIGINT | FK → `account.id`, NULLABLE | Patient đang giữ chỗ (CBS-72) |
+| `lock_expires_at` | TIMESTAMP | NULLABLE | BR-SCH-05, TTL giữ chỗ (cấu hình qua `SLOT_LOCK_TTL_MINUTES`) |
+| `version` | BIGINT | NOT NULL, DEFAULT 0 | Optimistic Locking, BR-APT-02 (CBS-72/CBS-42) |
 
-**Chưa implement — sẽ thêm ở CBS-41 (migration `V7`, ALTER TABLE, không sửa `V6`):**
+**Index:** composite index `(status, lock_expires_at)` — phục vụ job CBS-52 quét LOCKED hết hạn.
 
-| Cột | Kiểu | Ràng buộc | Ghi chú |
-|---|---|---|---|
-| `status` | — | thêm giá trị `LOCKED` vào CHECK constraint | Cần khi có luồng giữ chỗ (CBS-40) |
-| `locked_by_account_id` | BIGINT | FK → `account.id`, NULLABLE | Patient đang giữ chỗ |
-| `lock_expires_at` | TIMESTAMP | NULLABLE | BR-SCH-05, TTL giữ chỗ |
-| `version` | BIGINT | NOT NULL, DEFAULT 0 | Optimistic Locking, BR-APT-02 |
-
-**Index cần có (khi làm CBS-41):** composite index trên `(status, lock_expires_at)` — phục vụ job CBS-52 quét LOCKED hết hạn (đã note trong Jira CBS-41).
-
-**Unique constraint hiện có:** `UNIQUE(doctor_profile_id, work_date, start_time)` — chặn tạo 2 slot trùng giờ cho cùng 1 doctor (AC của CBS-38, ánh xạ từ `UNIQUE(doctorId, slotStart)` trong Jira).
+**Unique constraint:** `UNIQUE(doctor_profile_id, work_date, start_time)` — chặn tạo 2 slot trùng giờ cho cùng 1 doctor (AC của CBS-38, ánh xạ từ `UNIQUE(doctorId, slotStart)` trong Jira).
 
 ---
 
 ## 6. `appointment` — Lịch hẹn đã xác nhận
+
+**Đã implement (CBS-41, `V8__create_appointment_table.sql`):**
 
 | Cột | Kiểu | Ràng buộc | Ghi chú |
 |---|---|---|---|
@@ -127,11 +123,18 @@ account (N) ──── (N) audit_log                   [actor, không FK cứn
 | `doctor_schedule_id` | BIGINT | FK → `doctor_schedule.id`, **UNIQUE**, NOT NULL | BR-APT-01 — chống trùng ở tầng DB |
 | `patient_account_id` | BIGINT | FK → `account.id`, NOT NULL | |
 | `status` | VARCHAR(20) | NOT NULL, DEFAULT `CONFIRMED`, CHECK IN (`CONFIRMED`, `CANCELLED`) | |
+| `created_at` | TIMESTAMP | NOT NULL, DEFAULT now() | |
+| `cancelled_at` | TIMESTAMP | NULLABLE | |
+
+**Chưa implement — thuộc phạm vi AI Triage (Sprint 2), sẽ thêm bằng `ALTER TABLE` (`V9` trở đi) khi làm task đó, không thuộc CBS-40/41:**
+
+| Cột | Kiểu | Ràng buộc | Ghi chú |
+|---|---|---|---|
 | `triage_session_id` | BIGINT | FK → `triage_session.id`, NULLABLE | Có thể đặt lịch không qua AI |
 | `share_ai_summary_with_doctor` | BOOLEAN | NOT NULL, DEFAULT false | |
 | `ai_summary_snapshot` | TEXT | NULLABLE | Snapshot tại thời điểm đặt, KHÔNG tự update sau (BR-AI-06/BR-APT-06) |
-| `created_at` | TIMESTAMP | NOT NULL, DEFAULT now() | |
-| `cancelled_at` | TIMESTAMP | NULLABLE | |
+
+**Nghiệp vụ bổ sung ở tầng Service (không thể diễn đạt bằng constraint DB):** 1 Patient không được có 2 `appointment` CONFIRMED giao nhau về thời gian (`work_date`/`start_time`/`end_time` của `doctor_schedule` liên kết), kể cả với 2 doctor khác nhau — check trong `BookingServiceImpl.confirm()` trước khi insert.
 
 ---
 
