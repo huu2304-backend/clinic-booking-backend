@@ -4,13 +4,19 @@ import com.clinicbookingbackend.common.exception.BusinessException;
 import com.clinicbookingbackend.common.exception.ErrorCode;
 import com.clinicbookingbackend.dto.booking.AppointmentResponse;
 import com.clinicbookingbackend.dto.booking.ConfirmAppointmentRequest;
+import com.clinicbookingbackend.dto.booking.DoctorAppointmentResponse;
 import com.clinicbookingbackend.dto.booking.HoldResponse;
+import com.clinicbookingbackend.entity.account.PatientProfile;
 import com.clinicbookingbackend.entity.appointment.Appointment;
 import com.clinicbookingbackend.entity.appointment.enums.AppointmentStatus;
+import com.clinicbookingbackend.entity.doctor.DoctorProfile;
 import com.clinicbookingbackend.entity.doctorschedule.DoctorSchedule;
 import com.clinicbookingbackend.entity.doctorschedule.enums.ScheduleStatus;
 import com.clinicbookingbackend.mapper.booking.AppointmentMapper;
+import com.clinicbookingbackend.mapper.booking.DoctorAppointmentMapper;
+import com.clinicbookingbackend.repository.account.PatientProfileRepository;
 import com.clinicbookingbackend.repository.appointment.AppointmentRepository;
+import com.clinicbookingbackend.repository.doctor.DoctorProfileRepository;
 import com.clinicbookingbackend.repository.doctorschedule.DoctorScheduleRepository;
 import com.clinicbookingbackend.security.SecurityUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -20,7 +26,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -29,6 +39,9 @@ public class BookingServiceImpl implements BookingService {
     private final DoctorScheduleRepository doctorScheduleRepository;
     private final AppointmentRepository appointmentRepository;
     private final AppointmentMapper appointmentMapper;
+    private final DoctorProfileRepository doctorProfileRepository;
+    private final PatientProfileRepository patientProfileRepository;
+    private final DoctorAppointmentMapper doctorAppointmentMapper;
     private final Clock clock;
     private final long slotLockTtlMinutes;
     private final long cancellationMinHours;
@@ -40,12 +53,18 @@ public class BookingServiceImpl implements BookingService {
             DoctorScheduleRepository doctorScheduleRepository,
             AppointmentRepository appointmentRepository,
             AppointmentMapper appointmentMapper,
+            DoctorProfileRepository doctorProfileRepository,
+            PatientProfileRepository patientProfileRepository,
+            DoctorAppointmentMapper doctorAppointmentMapper,
             Clock clock,
             @Value("${booking.slot-lock-ttl-minutes}") long slotLockTtlMinutes,
             @Value("${booking.cancellation-min-hours}") long cancellationMinHours) {
         this.doctorScheduleRepository = doctorScheduleRepository;
         this.appointmentRepository = appointmentRepository;
         this.appointmentMapper = appointmentMapper;
+        this.doctorProfileRepository = doctorProfileRepository;
+        this.patientProfileRepository = patientProfileRepository;
+        this.doctorAppointmentMapper = doctorAppointmentMapper;
         this.clock = clock;
         this.slotLockTtlMinutes = slotLockTtlMinutes;
         this.cancellationMinHours = cancellationMinHours;
@@ -164,6 +183,43 @@ public class BookingServiceImpl implements BookingService {
                 saved.getId(), doctorScheduleId, patientAccountId);
 
         return appointmentMapper.toResponse(saved);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<DoctorAppointmentResponse> getMyAppointments(LocalDate date, Authentication authentication) {
+        Long accountId = SecurityUtils.getCurrentAccountId(authentication);
+
+        // Ownership qua DoctorProfile gắn với accountId từ JWT — Doctor không thể truyền doctorId
+        // của người khác vì request không nhận tham số này.
+        DoctorProfile doctorProfile = doctorProfileRepository.findByAccountId(accountId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.DOCTOR_NOT_FOUND,
+                        "Không tìm thấy hồ sơ bác sĩ cho tài khoản đang đăng nhập"));
+
+        List<Appointment> appointments = appointmentRepository
+                .findByDoctorScheduleDoctorProfileIdAndDoctorScheduleWorkDateAndStatusOrderByDoctorScheduleStartTimeAsc(
+                        doctorProfile.getId(), date, AppointmentStatus.CONFIRMED);
+
+        Map<Long, String> patientFullNamesByAccountId = resolvePatientFullNames(appointments);
+
+        return appointments.stream()
+                .map(appointment -> doctorAppointmentMapper.toResponse(
+                        appointment, patientFullNamesByAccountId.get(appointment.getPatientAccountId())))
+                .toList();
+    }
+
+    // Appointment chỉ lưu patientAccountId thô (không có quan hệ JPA tới PatientProfile) — resolve
+    // tên bệnh nhân bằng 1 query gộp theo lô thay vì N+1 query cho từng Appointment.
+    private Map<Long, String> resolvePatientFullNames(List<Appointment> appointments) {
+        List<Long> patientAccountIds = appointments.stream()
+                .map(Appointment::getPatientAccountId)
+                .distinct()
+                .toList();
+        if (patientAccountIds.isEmpty()) {
+            return Map.of();
+        }
+        return patientProfileRepository.findByAccountIdIn(patientAccountIds).stream()
+                .collect(Collectors.toMap(profile -> profile.getAccount().getId(), PatientProfile::getFullName));
     }
 
     @Override
