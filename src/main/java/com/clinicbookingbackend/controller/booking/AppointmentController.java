@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,5 +26,10 @@ public class AppointmentController {
                                                          Authentication authentication) {
         AppointmentResponse response = bookingService.confirm(request, authentication);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PostMapping("/{id}/cancel")
+    public ResponseEntity<AppointmentResponse> cancel(@PathVariable Long id, Authentication authentication) {
+        return ResponseEntity.ok(bookingService.cancel(id, authentication));
     }
 }

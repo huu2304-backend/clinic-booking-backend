@@ -24,4 +24,10 @@ public interface BookingService {
     // CBS-53: Doctor xem Appointment CONFIRMED trong ngày của chính mình — ownership qua
     // DoctorProfile gắn với accountId từ JWT (SecurityUtils), không nhận doctorId từ request.
     List<DoctorAppointmentResponse> getMyAppointments(LocalDate date, Authentication authentication);
+
+    // CBS-51: Patient hủy Appointment CONFIRMED của chính mình (ownership qua JWT, không nhận
+    // patientId từ request body), chỉ khi còn cách giờ khám tối thiểu N giờ (BR-APT-04, N cấu
+    // hình qua application.properties, không hardcode). Appointment.status=CANCELLED và
+    // DoctorSchedule.status=AVAILABLE cập nhật cùng 1 @Transactional (BR-APT-05).
+    AppointmentResponse cancel(Long appointmentId, Authentication authentication);
 }
