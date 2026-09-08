@@ -24,6 +24,7 @@ public enum ErrorCode {
     DEPARTMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "Khoa không tồn tại"),
     DOCTOR_NOT_FOUND(HttpStatus.NOT_FOUND, "Bác sĩ không tồn tại"),
     SCHEDULE_NOT_FOUND(HttpStatus.NOT_FOUND, "Không tìm thấy lịch làm việc"),
+    APPOINTMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "Không tìm thấy lịch hẹn"),
 
     // 409 - Conflict (nghiệp vụ CBS)
     DEPARTMENT_NAME_ALREADY_EXISTS(HttpStatus.CONFLICT, "Tên khoa đã tồn tại"),

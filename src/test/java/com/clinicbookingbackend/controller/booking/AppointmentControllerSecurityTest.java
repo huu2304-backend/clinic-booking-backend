@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.mockito.ArgumentMatchers.anyLong;
 
 // Test riêng (không addFilters=false) để verify thật rule
 // "/api/appointments" POST -> hasRole("PATIENT") trong SecurityConfig
@@ -89,5 +90,43 @@ class AppointmentControllerSecurityTest {
                         .contentType("application/json")
                         .content(confirmRequestJson()))
                 .andExpect(status().isCreated());
+    }
+
+    // ---------- POST /api/appointments/{id}/cancel ----------
+
+    @Test
+    void cancel_shouldBeRejected_whenNoToken() throws Exception {
+        mockMvc.perform(post("/api/appointments/1/cancel"))
+                .andExpect(status().is4xxClientError());
+    }
+
+    @Test
+    void cancel_shouldReturn403_whenTokenRoleIsDoctor() throws Exception {
+        when(jwtUtil.parseToken(anyString())).thenReturn(new JwtPayload(10L, "DOCTOR"));
+
+        mockMvc.perform(post("/api/appointments/1/cancel")
+                        .header("Authorization", "Bearer fake-token"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void cancel_shouldReturn403_whenTokenRoleIsAdmin() throws Exception {
+        when(jwtUtil.parseToken(anyString())).thenReturn(new JwtPayload(999L, "ADMIN"));
+
+        mockMvc.perform(post("/api/appointments/1/cancel")
+                        .header("Authorization", "Bearer fake-token"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void cancel_shouldBeAllowedByPathRule_whenTokenRoleIsPatient() throws Exception {
+        when(jwtUtil.parseToken(anyString())).thenReturn(new JwtPayload(1L, "PATIENT"));
+        when(bookingService.cancel(anyLong(), any())).thenReturn(
+                new AppointmentResponse(1L, 1L, 100L, "Nguyễn Văn An",
+                        LocalDate.of(2026, 9, 10), LocalTime.of(9, 0), LocalTime.of(9, 30), "CANCELLED", LocalDateTime.now()));
+
+        mockMvc.perform(post("/api/appointments/1/cancel")
+                        .header("Authorization", "Bearer fake-token"))
+                .andExpect(status().isOk());
     }
 }

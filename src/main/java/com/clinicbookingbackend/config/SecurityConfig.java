@@ -31,6 +31,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/patients/me").hasRole("PATIENT") // Xem/sửa hồ sơ cá nhân (CBS-66) — chỉ Patient
                         .requestMatchers(HttpMethod.POST, "/api/schedules/*/hold", "/api/schedules/*/release-hold").hasRole("PATIENT") // Giữ chỗ/hủy giữ chỗ (CBS-72) — chỉ Patient
                         .requestMatchers(HttpMethod.POST, "/api/appointments").hasRole("PATIENT") // Xác nhận đặt lịch (CBS-42) — chỉ Patient
+                        .requestMatchers(HttpMethod.POST, "/api/appointments/*/cancel").hasRole("PATIENT") // Hủy lịch hẹn (CBS-51) — chỉ Patient, ownership check trong Service
                         .anyRequest().authenticated() // MỌI API khác bắt buộc phải có JWT hợp lệ
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

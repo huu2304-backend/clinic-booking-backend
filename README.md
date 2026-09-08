@@ -62,6 +62,7 @@ For each department, the first 2 doctors (by id) get `AVAILABLE` slots seeded fo
 | `JWT_EXPIRATION` | `86400000` | Token TTL (ms) |
 | `SLOT_LOCK_TTL_MINUTES` | `5` | How long a held slot stays `LOCKED` before auto-release |
 | `LOCK_SWEEP_INTERVAL_MS` | `60000` | Interval of the expired-lock sweep job |
+| `CANCELLATION_MIN_HOURS` | `24` | Minimum hours before an appointment's start time that a patient may still cancel it |
 | `SPRING_PROFILES_ACTIVE` | unset | Set to `prod` to disable `DemoDataSeeder` (no demo data seeded) |
 
 ## Core business rules
@@ -69,12 +70,13 @@ For each department, the first 2 doctors (by id) get `AVAILABLE` slots seeded fo
 - Booking is two-step: `POST /api/schedules/{id}/hold` (AVAILABLE→LOCKED) then `POST /api/appointments` (LOCKED→BOOKED + creates `Appointment` CONFIRMED), both guarded by `@Version` optimistic locking
 - DB-level safety net: `UNIQUE(appointment.doctor_schedule_id)`
 - A patient can't hold/confirm a slot that's `BOOKED`, or `LOCKED` by someone else and not yet expired
+- `POST /api/appointments/{id}/cancel`: only the owning patient can cancel their own `CONFIRMED` appointment, and only up to `CANCELLATION_MIN_HOURS` before its start time; cancelling sets `Appointment.status=CANCELLED` and reverts `doctor_schedule.status` to `AVAILABLE` in one transaction
 - `GET`/`PUT /api/patients/me`: a patient views/edits their own `PatientProfile` (accountId from JWT, not a path/query param) — no medical data lives on this profile
 
 ## Implemented so far
-Auth (register/login, JWT) · Department & Doctor CRUD (Admin) · Doctor schedule CRUD · Patient browse doctors/slots by department · Concurrency-safe booking (hold → confirm) · Expired-lock sweep job · Patient profile view/update · Demo data seeding (non-prod)
+Auth (register/login, JWT) · Department & Doctor CRUD (Admin) · Doctor schedule CRUD · Patient browse doctors/slots by department · Concurrency-safe booking (hold → confirm) · Expired-lock sweep job · Patient profile view/update · Demo data seeding (non-prod) · Appointment cancellation
 
-Not yet implemented: AI triage, appointment cancellation, Doctor dashboard, AI provider config admin, containerized backend deploy. Full task breakdown lives in Jira (project **CBS**), not tracked here.
+Not yet implemented: AI triage, Doctor dashboard, AI provider config admin, containerized backend deploy. Full task breakdown lives in Jira (project **CBS**), not tracked here.
 
 ## Testing
 JUnit 5 + Mockito for unit tests; `@SpringBootTest` for transactional/concurrency-critical flows against a real Postgres via Flyway (e.g. `BookingConcurrencyIntegrationTest`).
