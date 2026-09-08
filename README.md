@@ -9,7 +9,7 @@
 This repo is the **backend only**, flat at root (not a `backend/`+`frontend/` monorepo). A separate frontend calls this API — see the CORS config in `SecurityConfig`.
 
 ## Roles
-- **Patient**: register/login, browse departments & doctors, view available slots, hold → confirm a booking, cancel (planned), AI triage chat (planned)
+- **Patient**: register/login, view/update own profile, browse departments & doctors, view available slots, hold → confirm a booking, cancel (planned), AI triage chat (planned)
 - **Doctor**: view own daily appointments (planned)
 - **Admin**: CRUD Department/Doctor
 
@@ -69,9 +69,10 @@ For each department, the first 2 doctors (by id) get `AVAILABLE` slots seeded fo
 - Booking is two-step: `POST /api/schedules/{id}/hold` (AVAILABLE→LOCKED) then `POST /api/appointments` (LOCKED→BOOKED + creates `Appointment` CONFIRMED), both guarded by `@Version` optimistic locking
 - DB-level safety net: `UNIQUE(appointment.doctor_schedule_id)`
 - A patient can't hold/confirm a slot that's `BOOKED`, or `LOCKED` by someone else and not yet expired
+- `GET`/`PUT /api/patients/me`: a patient views/edits their own `PatientProfile` (accountId from JWT, not a path/query param) — no medical data lives on this profile
 
 ## Implemented so far
-Auth (register/login, JWT) · Department & Doctor CRUD (Admin) · Doctor schedule CRUD · Patient browse doctors/slots by department · Concurrency-safe booking (hold → confirm) · Expired-lock sweep job · Demo data seeding (non-prod)
+Auth (register/login, JWT) · Department & Doctor CRUD (Admin) · Doctor schedule CRUD · Patient browse doctors/slots by department · Concurrency-safe booking (hold → confirm) · Expired-lock sweep job · Patient profile view/update · Demo data seeding (non-prod)
 
 Not yet implemented: AI triage, appointment cancellation, Doctor dashboard, AI provider config admin, containerized backend deploy. Full task breakdown lives in Jira (project **CBS**), not tracked here.
 
