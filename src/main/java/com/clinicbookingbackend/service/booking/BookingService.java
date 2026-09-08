@@ -16,4 +16,10 @@ public interface BookingService {
 
     // CBS-42: LOCKED (bởi đúng Patient đang gọi, chưa hết hạn) -> BOOKED + tạo Appointment CONFIRMED.
     AppointmentResponse confirm(ConfirmAppointmentRequest request, Authentication authentication);
+
+    // CBS-51: Patient hủy Appointment CONFIRMED của chính mình (ownership qua JWT, không nhận
+    // patientId từ request body), chỉ khi còn cách giờ khám tối thiểu N giờ (BR-APT-04, N cấu
+    // hình qua application.properties, không hardcode). Appointment.status=CANCELLED và
+    // DoctorSchedule.status=AVAILABLE cập nhật cùng 1 @Transactional (BR-APT-05).
+    AppointmentResponse cancel(Long appointmentId, Authentication authentication);
 }

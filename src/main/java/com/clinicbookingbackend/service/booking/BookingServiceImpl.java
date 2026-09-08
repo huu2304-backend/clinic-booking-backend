@@ -31,6 +31,7 @@ public class BookingServiceImpl implements BookingService {
     private final AppointmentMapper appointmentMapper;
     private final Clock clock;
     private final long slotLockTtlMinutes;
+    private final long cancellationMinHours;
 
     // @Value trên tham số constructor (không phải field) — theo đúng convention của JwtUtil,
     // giúp test dựng service bằng `new BookingServiceImpl(...)` với TTL cố định, không cần
@@ -40,12 +41,14 @@ public class BookingServiceImpl implements BookingService {
             AppointmentRepository appointmentRepository,
             AppointmentMapper appointmentMapper,
             Clock clock,
-            @Value("${booking.slot-lock-ttl-minutes}") long slotLockTtlMinutes) {
+            @Value("${booking.slot-lock-ttl-minutes}") long slotLockTtlMinutes,
+            @Value("${booking.cancellation-min-hours}") long cancellationMinHours) {
         this.doctorScheduleRepository = doctorScheduleRepository;
         this.appointmentRepository = appointmentRepository;
         this.appointmentMapper = appointmentMapper;
         this.clock = clock;
         this.slotLockTtlMinutes = slotLockTtlMinutes;
+        this.cancellationMinHours = cancellationMinHours;
     }
 
     @Override
@@ -161,6 +164,56 @@ public class BookingServiceImpl implements BookingService {
                 saved.getId(), doctorScheduleId, patientAccountId);
 
         return appointmentMapper.toResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public AppointmentResponse cancel(Long appointmentId, Authentication authentication) {
+        Long patientAccountId = SecurityUtils.getCurrentAccountId(authentication);
+        log.info("Patient accountId={} hủy lịch hẹn id={}", patientAccountId, appointmentId);
+
+        Appointment appointment = appointmentRepository.findById(appointmentId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.APPOINTMENT_NOT_FOUND,
+                        "Không tìm thấy lịch hẹn với id=" + appointmentId));
+
+        // Ownership qua patientId lấy từ JWT (SecurityUtils), không nhận từ request body.
+        if (!patientAccountId.equals(appointment.getPatientAccountId())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "Bạn không có quyền hủy lịch hẹn này");
+        }
+
+        if (appointment.getStatus() != AppointmentStatus.CONFIRMED) {
+            throw new BusinessException(ErrorCode.CANCELLATION_NOT_ALLOWED,
+                    "Lịch hẹn không ở trạng thái có thể hủy");
+        }
+
+        DoctorSchedule schedule = appointment.getDoctorSchedule();
+        LocalDateTime appointmentStart = schedule.getWorkDate().atTime(schedule.getStartTime());
+        LocalDateTime now = LocalDateTime.now(clock);
+        LocalDateTime cancellationDeadline = appointmentStart.minusHours(cancellationMinHours);
+
+        // BR-APT-04: chỉ hủy được nếu còn cách giờ khám tối thiểu N giờ (N cấu hình qua
+        // application.properties, không hardcode) -> quá hạn ném 409 CANCELLATION_NOT_ALLOWED (EX-APT-01).
+        if (now.isAfter(cancellationDeadline)) {
+            throw new BusinessException(ErrorCode.CANCELLATION_NOT_ALLOWED,
+                    "Chỉ có thể hủy lịch hẹn trước giờ khám tối thiểu " + cancellationMinHours + " giờ");
+        }
+
+        // BR-APT-05: Appointment.status=CANCELLED + DoctorSchedule.status=AVAILABLE cập nhật cùng
+        // 1 @Transactional — DB lỗi giữa chừng thì rollback toàn bộ (EX-APT-04), không để 1 bảng
+        // cập nhật còn bảng kia không.
+        appointment.setStatus(AppointmentStatus.CANCELLED);
+        appointment.setCancelledAt(now);
+        Appointment savedAppointment = appointmentRepository.save(appointment);
+
+        schedule.setStatus(ScheduleStatus.AVAILABLE);
+        schedule.setLockedByAccountId(null);
+        schedule.setLockExpiresAt(null);
+        doctorScheduleRepository.save(schedule);
+
+        log.info("Hủy lịch hẹn thành công appointmentId={}, slot id={} đã trả về AVAILABLE",
+                appointmentId, schedule.getId());
+
+        return appointmentMapper.toResponse(savedAppointment);
     }
 
     private boolean isLockExpired(DoctorSchedule schedule, LocalDateTime now) {

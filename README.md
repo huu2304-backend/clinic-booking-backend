@@ -50,12 +50,14 @@ API: `http://localhost:8080` · Swagger UI: `http://localhost:8080/swagger-ui/in
 | `JWT_EXPIRATION` | `86400000` | Token TTL (ms) |
 | `SLOT_LOCK_TTL_MINUTES` | `5` | How long a held slot stays `LOCKED` before auto-release |
 | `LOCK_SWEEP_INTERVAL_MS` | `60000` | Interval of the expired-lock sweep job |
+| `CANCELLATION_MIN_HOURS` | `24` | Minimum hours before an appointment's start time that a patient may still cancel it |
 
 ## Core business rules
 - `doctor_schedule.status` ∈ `AVAILABLE / LOCKED / BOOKED / CANCELLED`; `LOCKED` has a TTL and auto-reverts via a scheduled sweep job
 - Booking is two-step: `POST /api/schedules/{id}/hold` (AVAILABLE→LOCKED) then `POST /api/appointments` (LOCKED→BOOKED + creates `Appointment` CONFIRMED), both guarded by `@Version` optimistic locking
 - DB-level safety net: `UNIQUE(appointment.doctor_schedule_id)`
 - A patient can't hold/confirm a slot that's `BOOKED`, or `LOCKED` by someone else and not yet expired
+- `POST /api/appointments/{id}/cancel`: only the owning patient can cancel their own `CONFIRMED` appointment, and only up to `CANCELLATION_MIN_HOURS` before its start time; cancelling sets `Appointment.status=CANCELLED` and reverts `doctor_schedule.status` to `AVAILABLE` in one transaction
 
 ## Implemented so far
 Auth (register/login, JWT) · Department & Doctor CRUD (Admin) · Doctor schedule CRUD · Patient browse doctors/slots by department · Concurrency-safe booking (hold → confirm) · Expired-lock sweep job

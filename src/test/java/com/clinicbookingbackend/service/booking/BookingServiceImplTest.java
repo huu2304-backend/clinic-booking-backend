@@ -6,6 +6,7 @@ import com.clinicbookingbackend.dto.booking.AppointmentResponse;
 import com.clinicbookingbackend.dto.booking.ConfirmAppointmentRequest;
 import com.clinicbookingbackend.dto.booking.HoldResponse;
 import com.clinicbookingbackend.entity.appointment.Appointment;
+import com.clinicbookingbackend.entity.appointment.enums.AppointmentStatus;
 import com.clinicbookingbackend.entity.doctor.DoctorProfile;
 import com.clinicbookingbackend.entity.doctorschedule.DoctorSchedule;
 import com.clinicbookingbackend.entity.doctorschedule.enums.ScheduleStatus;
@@ -57,6 +58,7 @@ class BookingServiceImplTest {
     private static final ZoneId ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final LocalDate TODAY = LocalDate.of(2026, 9, 7);
     private static final long TTL_MINUTES = 5;
+    private static final long CANCELLATION_MIN_HOURS = 24;
     private static final Long PATIENT_ACCOUNT_ID = 1L;
     private static final Long OTHER_PATIENT_ACCOUNT_ID = 2L;
 
@@ -65,7 +67,8 @@ class BookingServiceImplTest {
     @BeforeEach
     void setUp() {
         bookingService = new BookingServiceImpl(
-                doctorScheduleRepository, appointmentRepository, appointmentMapper, clock, TTL_MINUTES);
+                doctorScheduleRepository, appointmentRepository, appointmentMapper, clock,
+                TTL_MINUTES, CANCELLATION_MIN_HOURS);
     }
 
     private void fixClockAt(LocalTime time) {
@@ -73,6 +76,22 @@ class BookingServiceImplTest {
         Instant instant = now.atZone(ZONE).toInstant();
         when(clock.instant()).thenReturn(instant);
         when(clock.getZone()).thenReturn(ZONE);
+    }
+
+    private void fixClockAtDateTime(LocalDateTime dateTime) {
+        now = dateTime;
+        Instant instant = now.atZone(ZONE).toInstant();
+        when(clock.instant()).thenReturn(instant);
+        when(clock.getZone()).thenReturn(ZONE);
+    }
+
+    private Appointment confirmedAppointmentWith(Long patientAccountId, DoctorSchedule schedule) {
+        Appointment appointment = new Appointment();
+        appointment.setId(1L);
+        appointment.setDoctorSchedule(schedule);
+        appointment.setPatientAccountId(patientAccountId);
+        appointment.setStatus(AppointmentStatus.CONFIRMED);
+        return appointment;
     }
 
     private Authentication authOf(Long accountId) {
@@ -269,5 +288,99 @@ class BookingServiceImplTest {
         assertThatThrownBy(() -> bookingService.confirm(new ConfirmAppointmentRequest(1L), authOf(PATIENT_ACCOUNT_ID)))
                 .isInstanceOf(BusinessException.class)
                 .satisfies(ex -> assertThat(((BusinessException) ex).getErrorCode()).isEqualTo(ErrorCode.SCHEDULE_NOT_FOUND));
+    }
+
+    // ---------- cancel() ----------
+    // Appointment cố định workDate=2026-09-10, startTime=09:00 (từ scheduleWith) -> deadline hủy
+    // (CANCELLATION_MIN_HOURS=24) là 2026-09-09T09:00.
+
+    @Test
+    void cancel_shouldSucceed_whenOwnerCancelsWithinDeadline() {
+        DoctorSchedule schedule = scheduleWith(ScheduleStatus.BOOKED, null, null);
+        Appointment appointment = confirmedAppointmentWith(PATIENT_ACCOUNT_ID, schedule);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(appointment));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(doctorScheduleRepository.save(any(DoctorSchedule.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(appointmentMapper.toResponse(any(Appointment.class))).thenReturn(
+                new AppointmentResponse(1L, 1L, 100L, "Nguyễn Văn An",
+                        schedule.getWorkDate(), schedule.getStartTime(), schedule.getEndTime(), "CANCELLED", LocalDateTime.now()));
+        fixClockAtDateTime(LocalDateTime.of(2026, 9, 9, 8, 0));
+
+        AppointmentResponse response = bookingService.cancel(1L, authOf(PATIENT_ACCOUNT_ID));
+
+        assertThat(response.status()).isEqualTo("CANCELLED");
+        assertThat(appointment.getStatus()).isEqualTo(AppointmentStatus.CANCELLED);
+        assertThat(appointment.getCancelledAt()).isEqualTo(now);
+        assertThat(schedule.getStatus()).isEqualTo(ScheduleStatus.AVAILABLE);
+        verify(appointmentRepository).save(appointment);
+        verify(doctorScheduleRepository).save(schedule);
+    }
+
+    @Test
+    void cancel_shouldSucceed_whenExactlyAtDeadline() {
+        DoctorSchedule schedule = scheduleWith(ScheduleStatus.BOOKED, null, null);
+        Appointment appointment = confirmedAppointmentWith(PATIENT_ACCOUNT_ID, schedule);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(appointment));
+        when(appointmentRepository.save(any(Appointment.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(doctorScheduleRepository.save(any(DoctorSchedule.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(appointmentMapper.toResponse(any(Appointment.class))).thenReturn(
+                new AppointmentResponse(1L, 1L, 100L, "Nguyễn Văn An",
+                        schedule.getWorkDate(), schedule.getStartTime(), schedule.getEndTime(), "CANCELLED", LocalDateTime.now()));
+        fixClockAtDateTime(LocalDateTime.of(2026, 9, 9, 9, 0));
+
+        AppointmentResponse response = bookingService.cancel(1L, authOf(PATIENT_ACCOUNT_ID));
+
+        assertThat(response.status()).isEqualTo("CANCELLED");
+    }
+
+    @Test
+    void cancel_shouldReturn409_whenPastCancellationDeadline() {
+        DoctorSchedule schedule = scheduleWith(ScheduleStatus.BOOKED, null, null);
+        Appointment appointment = confirmedAppointmentWith(PATIENT_ACCOUNT_ID, schedule);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(appointment));
+        fixClockAtDateTime(LocalDateTime.of(2026, 9, 9, 9, 1));
+
+        assertThatThrownBy(() -> bookingService.cancel(1L, authOf(PATIENT_ACCOUNT_ID)))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(ex -> assertThat(((BusinessException) ex).getErrorCode()).isEqualTo(ErrorCode.CANCELLATION_NOT_ALLOWED));
+
+        verify(appointmentRepository, never()).save(any());
+        verify(doctorScheduleRepository, never()).save(any());
+    }
+
+    @Test
+    void cancel_shouldReturn409_whenAlreadyCancelled() {
+        DoctorSchedule schedule = scheduleWith(ScheduleStatus.AVAILABLE, null, null);
+        Appointment appointment = confirmedAppointmentWith(PATIENT_ACCOUNT_ID, schedule);
+        appointment.setStatus(AppointmentStatus.CANCELLED);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(appointment));
+
+        assertThatThrownBy(() -> bookingService.cancel(1L, authOf(PATIENT_ACCOUNT_ID)))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(ex -> assertThat(((BusinessException) ex).getErrorCode()).isEqualTo(ErrorCode.CANCELLATION_NOT_ALLOWED));
+
+        verify(appointmentRepository, never()).save(any());
+    }
+
+    @Test
+    void cancel_shouldReturn403_whenNotOwner() {
+        DoctorSchedule schedule = scheduleWith(ScheduleStatus.BOOKED, null, null);
+        Appointment appointment = confirmedAppointmentWith(OTHER_PATIENT_ACCOUNT_ID, schedule);
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.of(appointment));
+
+        assertThatThrownBy(() -> bookingService.cancel(1L, authOf(PATIENT_ACCOUNT_ID)))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(ex -> assertThat(((BusinessException) ex).getErrorCode()).isEqualTo(ErrorCode.FORBIDDEN));
+
+        verify(appointmentRepository, never()).save(any());
+    }
+
+    @Test
+    void cancel_shouldReturn404_whenAppointmentNotFound() {
+        when(appointmentRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> bookingService.cancel(1L, authOf(PATIENT_ACCOUNT_ID)))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(ex -> assertThat(((BusinessException) ex).getErrorCode()).isEqualTo(ErrorCode.APPOINTMENT_NOT_FOUND));
     }
 }
