@@ -6,7 +6,7 @@ Spring Boot backend for **CBS (Clinic Booking System)** — appointment booking;
 Java 17 · Maven (`mvnw`/`mvnw.cmd`) · Spring Boot 4.1.0 (Web MVC/JPA/Security/Validation) · PostgreSQL via Docker + **Flyway** (`ddl-auto=validate` — Flyway owns the schema, Hibernate never auto-generates tables) · JWT (jjwt 0.12.6) · springdoc-openapi (`/swagger-ui/index.html`) · MapStruct 1.6.3 (+ `lombok-mapstruct-binding`)
 
 ## Package layout (`src/main/java/com/clinicbookingbackend/`)
-Feature-scoped by domain: each domain (`auth`, `account`, `department`, `doctor`, `doctorschedule`, `booking`, ...) has its own subpackage under `controller/`, `dto/`, `entity/`, `mapper/`, `repository/`, `service/`. `config`, `security`, `common/exception` are shared across the app. New domain → mirror the subpackage across layers, no need to update this file.
+Feature-scoped by domain: each domain (`auth`, `account`, `department`, `doctor`, `doctorschedule`, `booking`, ...) has its own subpackage under `controller/`, `dto/`, `entity/`, `mapper/`, `repository/`, `service/`. `config`, `security`, `common/exception` are shared across the app. New domain → mirror the subpackage across layers, no need to update this file. `scheduler/` holds `@Scheduled` jobs, `seed/` holds startup `CommandLineRunner` demo-data seeding (`@Profile("!prod")` — never runs in production).
 Note: `service/department` and `service/doctor` follow interface+Impl; `service/auth` and `service/booking` are concrete classes — both conventions coexist, not yet unified.
 
 ## Migrations
@@ -26,7 +26,7 @@ Cloud site `huu2342003.atlassian.net`, project key `CBS`. Look up a task via Atl
 - **Migration**: new `V{n+1}` file, never edit an old one. Sync `docs/DATABASE_DESIGN.md` immediately when schema changes.
 
 ## Running locally
-`.env.example` → `.env` (`DB_NAME`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`, `JWT_EXPIRATION`) → `docker compose up -d` (Postgres `cbs_postgres`) → `./mvnw spring-boot:run` (`mvnw.cmd` on Windows). Backend not yet Dockerized (planned Sprint 5).
+`.env.example` → `.env` (`DB_NAME`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`, `JWT_EXPIRATION`) → `docker compose up -d` (Postgres `cbs_postgres`) → `./mvnw spring-boot:run` (`mvnw.cmd` on Windows). Backend not yet Dockerized (planned Sprint 5). `DemoDataSeeder` (`seed/`) auto-creates demo accounts + doctor slots on every startup unless `SPRING_PROFILES_ACTIVE=prod` — see README "Demo accounts" for credentials.
 
 ## Git flow
 `main` / `develop` / `feature/CBS-xx-description` (Jira key `CBS`). PRs merge into `develop`. Remote: `github.com/huu2304-backend/clinic-booking-backend`.
