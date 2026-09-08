@@ -1,17 +1,25 @@
 package com.clinicbookingbackend.repository.appointment;
 
 import com.clinicbookingbackend.entity.appointment.Appointment;
+import com.clinicbookingbackend.entity.appointment.enums.AppointmentStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 import java.util.Optional;
 
 public interface AppointmentRepository extends JpaRepository<Appointment, Long> {
 
     Optional<Appointment> findByDoctorScheduleId(Long doctorScheduleId);
+
+    // CBS-53: Doctor xem Appointment trong ngày của chính mình — ownership xác minh qua chuỗi
+    // Appointment -> DoctorSchedule -> doctorProfile.id (đối chiếu DoctorProfile của Doctor đang
+    // login), không lọc thủ công ở tầng Service.
+    List<Appointment> findByDoctorScheduleDoctorProfileIdAndDoctorScheduleWorkDateAndStatusOrderByDoctorScheduleStartTimeAsc(
+            Long doctorProfileId, LocalDate workDate, AppointmentStatus status);
 
     // 1 Patient không được có 2 appointment CONFIRMED giao nhau về thời gian, kể cả với 2 bác sĩ
     // khác nhau — check nghiệp vụ ở tầng Service trước khi confirm (CBS-42), khác với UNIQUE

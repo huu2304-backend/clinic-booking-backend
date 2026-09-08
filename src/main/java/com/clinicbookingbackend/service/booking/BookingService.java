@@ -2,8 +2,12 @@ package com.clinicbookingbackend.service.booking;
 
 import com.clinicbookingbackend.dto.booking.AppointmentResponse;
 import com.clinicbookingbackend.dto.booking.ConfirmAppointmentRequest;
+import com.clinicbookingbackend.dto.booking.DoctorAppointmentResponse;
 import com.clinicbookingbackend.dto.booking.HoldResponse;
 import org.springframework.security.core.Authentication;
+
+import java.time.LocalDate;
+import java.util.List;
 
 public interface BookingService {
 
@@ -16,4 +20,8 @@ public interface BookingService {
 
     // CBS-42: LOCKED (bởi đúng Patient đang gọi, chưa hết hạn) -> BOOKED + tạo Appointment CONFIRMED.
     AppointmentResponse confirm(ConfirmAppointmentRequest request, Authentication authentication);
+
+    // CBS-53: Doctor xem Appointment CONFIRMED trong ngày của chính mình — ownership qua
+    // DoctorProfile gắn với accountId từ JWT (SecurityUtils), không nhận doctorId từ request.
+    List<DoctorAppointmentResponse> getMyAppointments(LocalDate date, Authentication authentication);
 }
