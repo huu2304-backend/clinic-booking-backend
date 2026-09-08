@@ -28,6 +28,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/**").hasRole("ADMIN") // Chỉ ADMIN mới được gọi các API quản trị
                         .requestMatchers("/api/doctor-schedules/**").hasAnyRole("ADMIN", "DOCTOR") // Ownership check (chỉ chủ sở hữu) nằm trong Service
                         .requestMatchers("/api/departments/*/doctors", "/api/doctors/*/schedules").authenticated() // Patient xem khoa/lịch trống (CBS-39) — mọi role đã login đều xem được
+                        .requestMatchers("/api/patients/me").hasRole("PATIENT") // Xem/sửa hồ sơ cá nhân (CBS-66) — chỉ Patient
                         .requestMatchers(HttpMethod.POST, "/api/schedules/*/hold", "/api/schedules/*/release-hold").hasRole("PATIENT") // Giữ chỗ/hủy giữ chỗ (CBS-72) — chỉ Patient
                         .requestMatchers(HttpMethod.POST, "/api/appointments").hasRole("PATIENT") // Xác nhận đặt lịch (CBS-42) — chỉ Patient
                         .requestMatchers(HttpMethod.POST, "/api/appointments/*/cancel").hasRole("PATIENT") // Hủy lịch hẹn (CBS-51) — chỉ Patient, ownership check trong Service

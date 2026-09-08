@@ -39,4 +39,7 @@ public class PatientProfile {
 
     @Column(length = 20, nullable = true)
     private String phoneNumber;
+
+    @Column(length = 255, nullable = true)
+    private String address;
 }
