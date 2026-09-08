@@ -24,8 +24,8 @@ account [patient] (1) ── (N) appointment
 | status | VARCHAR(20) NOT NULL DEFAULT ACTIVE, CHECK IN (ACTIVE, INACTIVE, LOCKED) | |
 | created_at / updated_at | TIMESTAMP | |
 
-## `patient_profile` (V2)
-id · account_id (FK, UNIQUE) · full_name · date_of_birth · gender · phone_number. No medical data here.
+## `patient_profile` (V2, `address` added in V9)
+id · account_id (FK, UNIQUE) · full_name · date_of_birth · gender · phone_number · address. No medical data here.
 
 ## `department` (V3)
 id · name (UNIQUE) · description
