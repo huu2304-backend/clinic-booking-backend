@@ -4,6 +4,11 @@
 > Cập nhật file này TRƯỚC khi đổi schema trong code — đừng để lệch giữa thiết kế và migration thật.
 > Nguồn nghiệp vụ gốc: `docs/business-rules.docx` (AI.docx đã phân tích ở phần PLAN).
 
+**Lưu ý về migrate up/down (US-BOOK-01.1):** dự án dùng Flyway Community (free), không có tính năng
+undo/rollback tự động (`U__` script chỉ có ở Flyway Teams trả phí). "Down" ở local nghĩa là:
+`docker compose down -v` (xoá volume Postgres) rồi `docker compose up -d postgres` + chạy lại app
+để Flyway migrate lại từ đầu trên DB trống — không có cơ chế lùi từng bước tự động.
+
 ---
 
 ## ✅ Quyết định kiến trúc (đã chốt 2026-08 — trước khi code CBS-35/36)
