@@ -8,11 +8,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/appointments")
@@ -20,6 +23,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class AppointmentController {
 
     private final BookingService bookingService;
+
+    // CBS-70: "Lịch hẹn của tôi" — Patient xem toàn bộ Appointment (mọi status) của chính mình.
+    @GetMapping
+    public ResponseEntity<List<AppointmentResponse>> getMyAppointments(Authentication authentication) {
+        return ResponseEntity.ok(bookingService.getMyAppointments(authentication));
+    }
 
     @PostMapping
     public ResponseEntity<AppointmentResponse> confirm(@Valid @RequestBody ConfirmAppointmentRequest request,

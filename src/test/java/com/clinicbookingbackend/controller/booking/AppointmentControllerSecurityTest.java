@@ -19,9 +19,12 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 
+import java.util.List;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -90,6 +93,33 @@ class AppointmentControllerSecurityTest {
                         .contentType("application/json")
                         .content(confirmRequestJson()))
                 .andExpect(status().isCreated());
+    }
+
+    // ---------- GET /api/appointments (CBS-70) ----------
+
+    @Test
+    void getMyAppointments_shouldBeRejected_whenNoToken() throws Exception {
+        mockMvc.perform(get("/api/appointments"))
+                .andExpect(status().is4xxClientError());
+    }
+
+    @Test
+    void getMyAppointments_shouldReturn403_whenTokenRoleIsDoctor() throws Exception {
+        when(jwtUtil.parseToken(anyString())).thenReturn(new JwtPayload(10L, "DOCTOR"));
+
+        mockMvc.perform(get("/api/appointments")
+                        .header("Authorization", "Bearer fake-token"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void getMyAppointments_shouldBeAllowedByPathRule_whenTokenRoleIsPatient() throws Exception {
+        when(jwtUtil.parseToken(anyString())).thenReturn(new JwtPayload(1L, "PATIENT"));
+        when(bookingService.getMyAppointments(any())).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/appointments")
+                        .header("Authorization", "Bearer fake-token"))
+                .andExpect(status().isOk());
     }
 
     // ---------- POST /api/appointments/{id}/cancel ----------

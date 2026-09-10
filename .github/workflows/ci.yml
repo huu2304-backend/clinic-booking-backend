@@ -1,0 +1,70 @@
+name: CI
+
+# CBS-63: build/test tự động khi có PR vào develop hoặc main, đúng Git Flow của repo.
+on:
+  pull_request:
+    branches: [develop, main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+
+    services:
+      # Flyway (ddl-auto=validate) + JPA cần Postgres thật, không dùng H2 — mirror docker-compose.yml.
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: cbs_db
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cbs_db"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DB_NAME: cbs_db
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      # Dummy, chỉ dùng trong CI — HS256 (jjwt) yêu cầu key tối thiểu 256 bit (32 ký tự).
+      JWT_SECRET: ci-only-dummy-secret-do-not-use-in-prod-32bytes-min
+      JWT_EXPIRATION: 86400000
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Run tests (mvn test)
+        run: ./mvnw --batch-mode --no-transfer-progress test 2>&1 | tee maven-output.log
+
+      # Viewing full job logs requires repo admin rights; surface failures as check-run
+      # annotations instead (readable by anyone via the public annotations API/PR UI).
+      - name: Surface failure details
+        if: failure()
+        run: |
+          echo "::group::Last 200 lines of Maven output"
+          tail -n 200 maven-output.log
+          echo "::endgroup::"
+
+          shopt -s nullglob
+          reports=(target/surefire-reports/*.txt)
+          if [ ${#reports[@]} -eq 0 ]; then
+            msg=$(tail -c 900 maven-output.log | tr '\n' ' ')
+            echo "::error title=Maven failed before any test ran::${msg}"
+          else
+            for f in "${reports[@]}"; do
+              if grep -qE "Failures: [1-9]|Errors: [1-9]" "$f"; then
+                name=$(basename "$f" .txt)
+                block=$(sed -n '/<<< FAILURE\|<<< ERROR/,/^$/p' "$f" | head -c 900)
+                echo "::error title=${name}::${block//$'\n'/ }"
+              fi
+            done
+          fi
