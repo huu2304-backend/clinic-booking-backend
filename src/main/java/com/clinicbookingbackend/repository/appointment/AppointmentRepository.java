@@ -15,6 +15,12 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
 
     Optional<Appointment> findByDoctorScheduleId(Long doctorScheduleId);
 
+    // "Lịch hẹn của tôi" (CBS-70): Patient xem toàn bộ Appointment của chính mình (mọi status,
+    // mới nhất trước) — ownership qua patientAccountId từ JWT ở tầng Service, không nhận filter
+    // theo patientId từ request.
+    List<Appointment> findByPatientAccountIdOrderByDoctorScheduleWorkDateDescDoctorScheduleStartTimeDesc(
+            Long patientAccountId);
+
     // CBS-53: Doctor xem Appointment trong ngày của chính mình — ownership xác minh qua chuỗi
     // Appointment -> DoctorSchedule -> doctorProfile.id (đối chiếu DoctorProfile của Doctor đang
     // login), không lọc thủ công ở tầng Service.

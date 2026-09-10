@@ -21,6 +21,10 @@ public interface BookingService {
     // CBS-42: LOCKED (bởi đúng Patient đang gọi, chưa hết hạn) -> BOOKED + tạo Appointment CONFIRMED.
     AppointmentResponse confirm(ConfirmAppointmentRequest request, Authentication authentication);
 
+    // CBS-70: Patient xem toàn bộ lịch hẹn (mọi status) của chính mình — ownership qua patientId
+    // từ JWT, không nhận patientId từ request.
+    List<AppointmentResponse> getMyAppointments(Authentication authentication);
+
     // CBS-53: Doctor xem Appointment CONFIRMED trong ngày của chính mình — ownership qua
     // DoctorProfile gắn với accountId từ JWT (SecurityUtils), không nhận doctorId từ request.
     List<DoctorAppointmentResponse> getMyAppointments(LocalDate date, Authentication authentication);

@@ -4,6 +4,7 @@ import com.clinicbookingbackend.config.SecurityConfig;
 import com.clinicbookingbackend.dto.doctor.DoctorSummaryResponse;
 import com.clinicbookingbackend.security.JwtPayload;
 import com.clinicbookingbackend.security.JwtUtil;
+import com.clinicbookingbackend.service.department.DepartmentService;
 import com.clinicbookingbackend.service.doctor.DoctorService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,12 +36,31 @@ class PatientDepartmentControllerSecurityTest {
     private DoctorService doctorService;
 
     @MockitoBean
+    private DepartmentService departmentService;
+
+    @MockitoBean
     private JwtUtil jwtUtil;
 
     private void mockDoctorServiceResponse() {
         DoctorSummaryResponse response = new DoctorSummaryResponse(100L, "Nguyễn Văn An", "Nội tổng quát", 1L);
         when(doctorService.getActiveDoctorsByDepartment(any(), any()))
                 .thenReturn(new PageImpl<>(List.of(response), PageRequest.of(0, 10), 1));
+    }
+
+    @Test
+    void getAll_shouldBeRejected_whenNoToken() throws Exception {
+        mockMvc.perform(get("/api/departments"))
+                .andExpect(status().is4xxClientError());
+    }
+
+    @Test
+    void getAll_shouldBeAllowed_whenTokenRoleIsPatient() throws Exception {
+        when(jwtUtil.parseToken(anyString())).thenReturn(new JwtPayload(1L, "PATIENT"));
+        when(departmentService.getAll()).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/departments")
+                        .header("Authorization", "Bearer fake-token"))
+                .andExpect(status().isOk());
     }
 
     @Test

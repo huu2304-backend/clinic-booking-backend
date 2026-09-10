@@ -187,6 +187,17 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<AppointmentResponse> getMyAppointments(Authentication authentication) {
+        Long patientAccountId = SecurityUtils.getCurrentAccountId(authentication);
+        return appointmentRepository
+                .findByPatientAccountIdOrderByDoctorScheduleWorkDateDescDoctorScheduleStartTimeDesc(patientAccountId)
+                .stream()
+                .map(appointmentMapper::toResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<DoctorAppointmentResponse> getMyAppointments(LocalDate date, Authentication authentication) {
         Long accountId = SecurityUtils.getCurrentAccountId(authentication);
 
